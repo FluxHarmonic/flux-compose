@@ -1,0 +1,7 @@
+#+title: Task List
+
+Here's a list of tasks we've come up with while coding on the project:
+
+* Interface
+
+** TODO Don't show Guile Scheme banner when starting =flux-studio=
