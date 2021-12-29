@@ -1,0 +1,15 @@
+#+title: Flux Compose
+
+/A creative composition studio for Scheme hackers./
+
+* What is it?
+
+This project is (or more accurately, will be) a studio for creative composition for works of music, video, and graphics, driven primarily by a declarative language created in [[https://www.gnu.org/software/guile/][Guile Scheme]].
+
+* Developed Live on YouTube
+
+This code is being written live on YouTube streams at the [[https://youtube.com/FluxHarmonicLive][Flux Harmonic channel]].  You can take a look at the notes from previous streams at the [[https://fluxharmonic.com/live-streams/][Live Streams]] section of the [[https://fluxharmonic.com][Flux Harmonic]] website.
+
+* License
+
+The code in this repository is licensed under the [[LICENSE][GNU General Public License 3.0]].
