@@ -3,6 +3,7 @@
    "gcc-toolchain"
    "make"
    "pkg-config"
+   "gdb"
 
    ;; Guile
    "guile"

@@ -4,4 +4,6 @@ Here's a list of tasks we've come up with while coding on the project:
 
 * Interface
 
-** TODO Don't show Guile Scheme banner when starting =flux-studio=
+** TODO Don't show Guile Scheme banner when starting =flux-compose=
+** TODO Make =init.scm= loading more tolerant to process start location (cwd)
+** TODO Don't use a brittle relative path to load =libflux.so=
