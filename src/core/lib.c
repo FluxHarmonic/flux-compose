@@ -5,7 +5,7 @@
 #include <SDL.h>
 #include <SDL2_gfxPrimitives.h>
 
-define TYPE_FILLED_CIRCLE 2
+#define TYPE_FILLED_CIRCLE 2
 
 typedef struct ColorType {
   Uint8 r;
@@ -33,7 +33,7 @@ typedef struct SceneType {
 
 SceneMember test_member = {
   .type = TYPE_FILLED_CIRCLE,
-  .props = &{
+  .props = &(Circle) {
     .x = 500,
     .y = 500,
     .radius = 400,
@@ -48,7 +48,7 @@ SceneMember test_member = {
 
 Scene test_scene = (Scene) {
   .member_count = 1,
-  .members = { test_member }
+  .members = &test_member
 };
 
 Scene* current_scene = &test_scene;
