@@ -10,6 +10,34 @@ This project is (or more accurately, will be) a studio for creative composition 
 
 This code is being written live on YouTube streams at the [[https://youtube.com/FluxHarmonicLive][Flux Harmonic channel]].  You can take a look at the notes from previous streams at the [[https://fluxharmonic.com/live-streams/][Live Streams]] section of the [[https://fluxharmonic.com][Flux Harmonic]] website.
 
+* How to Hack It
+
+If you're interested in cloning the code to try it out, I recommend [[https://guix.gnu.org/manual/en/html_node/Binary-Installation.html][installing the GNU Guix package manager]] ([[https://www.youtube.com/watch?v=Nk8sprN7oZ0][video]]).  Using Guix will allow you to install all compilation dependencies like so:
+
+#+begin_src sh
+
+  cd ~/path/to/flux-compose
+  guix shell
+
+#+end_src
+
+You will now be in a shell with all of the dependencies configured.  You can now build and run the code:
+
+#+begin_src sh
+
+  make
+  ./bin/flux-compose
+
+#+end_src
+
+** Editor Setup
+
+I use GNU Emacs to hack on and interface with this project. Here's what you need to use for a similar setup:
+
+- Emacs 28 (27 is sufficient)
+- [[https://www.nongnu.org/geiser/][Geiser]] (specifically =geiser-guile=) for Guile Scheme development
+- [[https://emacs-lsp.github.io/lsp-mode/][lsp-mode]] with the [[https://github.com/MaskRay/ccls][ccls]] language server for C development
+
 * License
 
 The code in this repository is licensed under the [[LICENSE][GNU General Public License 3.0]].
