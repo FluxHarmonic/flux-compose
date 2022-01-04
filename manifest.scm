@@ -1,5 +1,6 @@
 (specifications->manifest
  '(;; C/C++
+   "coreutils"
    "gcc-toolchain"
    "make"
    "pkg-config"
