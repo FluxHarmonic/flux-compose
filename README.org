@@ -17,7 +17,7 @@ If you're interested in cloning the code to try it out, I recommend [[https://gu
 #+begin_src sh
 
   cd ~/path/to/flux-compose
-  guix shell
+  guix shell --pure
 
 #+end_src
 
