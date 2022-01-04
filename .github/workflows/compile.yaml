@@ -1,0 +1,28 @@
+name: Compile project
+
+on:
+  push:
+    branches: '*'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v2
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get --no-install-recommends -y install guile-3.0-dev guile-3.0 guile-3.0-libs pkg-config make libsdl2-dev libsdl2-gfx-dev
+
+    - name: Compile
+      run: make
+
+    - name: Archive workflow results
+      uses: actions/upload-artifact@v2
+      with:
+        name: flux-compose
+        path: |
+          bin
+          !bin/**/*.o

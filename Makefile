@@ -14,7 +14,7 @@ $(OUT)/%.o: src/core/%.c
 	$(CC) -c $(CFLAGS) $< -o $@
 
 $(OUT)/flux-compose: $(OBJ)
-	${CC} $(LIBS) -o bin/flux-compose $(OBJ)
+	${CC} -o bin/flux-compose $(OBJ) $(LIBS)
 
 $(OUT)/libflux.so:
 	$(MAKE) -C lib
