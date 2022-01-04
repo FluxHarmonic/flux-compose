@@ -7,3 +7,10 @@ Here's a list of tasks we've come up with while coding on the project:
 ** TODO Don't show Guile Scheme banner when starting =flux-compose=
 ** TODO Make =init.scm= loading more tolerant to process start location (cwd)
 ** TODO Don't use a brittle relative path to load =libflux.so=
+
+* Graphics
+
+** TODO Use fragment shaders for drawing and effects
+
+https://thebookofshaders.com/ is an excellent resource!
+https://rubendv.be/posts/fwidth/
