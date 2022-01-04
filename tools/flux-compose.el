@@ -9,3 +9,5 @@
     (call-interactively #'run-geiser)))
 
 (global-set-key (kbd "C-c r") #'flux-compose-start-repl)
+
+(provide 'flux-compose)
