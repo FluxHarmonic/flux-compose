@@ -13,7 +13,7 @@
   (let ((default-directory (project-root (project-current)))
         (geiser-guile-binary (expand-file-name
                               (concat (project-root (project-current))
-                                      "bin/flux-compose")))
+                                      "build/flux-compose")))
         (geiser-guile-init-file flux-compose-current-project))
     (call-interactively #'run-geiser)))
 

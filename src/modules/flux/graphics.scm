@@ -27,26 +27,26 @@
 (define color-struct (list uint8 uint8 uint8 uint8))
 
 (define make-color-struct
-  (foreign-library-function (canonicalize-path "./bin/libflux.so") "make_color_struct"
+  (foreign-library-function (canonicalize-path "./build/libflux.so") "make_color_struct"
                             #:return-type '*
                             #:arg-types (list uint8 uint8 uint8 uint8)))
 
 (define make-circle-struct
-  (foreign-library-function (canonicalize-path "./bin/libflux.so") "make_circle_struct"
+  (foreign-library-function (canonicalize-path "./build/libflux.so") "make_circle_struct"
                             #:return-type '*
                             #:arg-types (list int16 int16 int16 '*)))
 (define add-scene-member
-  (foreign-library-function (canonicalize-path "./bin/libflux.so") "add_scene_member"
+  (foreign-library-function (canonicalize-path "./build/libflux.so") "add_scene_member"
                             #:return-type void
                             #:arg-types (list uint32 '*)))
 
 (define promote-staging-scene
-  (foreign-library-function (canonicalize-path "./bin/libflux.so") "promote_staging_scene"
+  (foreign-library-function (canonicalize-path "./build/libflux.so") "promote_staging_scene"
                             #:return-type void))
 
 (define init-graphics
   ;; TODO: Don't use a brittle path to load the library
-  (foreign-library-function (canonicalize-path "./bin/libflux.so") "init_graphics"
+  (foreign-library-function (canonicalize-path "./build/libflux.so") "init_graphics"
                             #:return-type void
                             #:arg-types (list int int)))
 
