@@ -25,8 +25,9 @@ You will now be in a shell with all of the dependencies configured.  You can now
 
 #+begin_src sh
 
-  make
-  ./bin/flux-compose
+  ./bootstrap.sh  # This is only needed the first time you clone the project
+  make -C build
+  ./build/flux-compose
 
 #+end_src
 
