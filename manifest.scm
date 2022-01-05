@@ -5,6 +5,7 @@
    "make"
    "pkg-config"
    "gdb"
+   "cmake"
 
    ;; Guile
    "guile"
