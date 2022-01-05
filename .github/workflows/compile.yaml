@@ -13,16 +13,19 @@ jobs:
       uses: actions/checkout@v2
 
     - name: Install dependencies
-      run: |
-        sudo apt-get --no-install-recommends -y install guile-3.0-dev guile-3.0 guile-3.0-libs pkg-config make libsdl2-dev libsdl2-gfx-dev
+      run: >
+        sudo apt-get --no-install-recommends -y install guile-3.0 guile-3.0-dev guile-3.0-libs libsdl2-dev libsdl2-gfx-dev make pkg-config
 
-    - name: Compile
-      run: make
+    - name: Configure
+      run: cmake -S. -Bbuild -DCMAKE_BUILD_TYPE=Release
+
+    - name: Build
+      run: make -C build
 
     - name: Archive workflow results
       uses: actions/upload-artifact@v2
       with:
         name: flux-compose
         path: |
-          bin
-          !bin/**/*.o
+          build/libflux.so
+          build/flux-compose
