@@ -2,9 +2,12 @@
   #:use-module (system foreign)
   #:use-module (system foreign-library)
   #:use-module (ice-9 pretty-print)
+  #:use-module (ice-9 iconv)
+  #:use-module (ice-9 i18n)
   #:use-module (srfi srfi-9)
   #:export (show-preview-window
             render-graphic
+            render-to-file
             make-circle
             make-color))
 
@@ -44,6 +47,10 @@
   (foreign-library-function (canonicalize-path "./build/libflux.so") "promote_staging_scene"
                             #:return-type void))
 
+(define request-render-to-file
+  (foreign-library-function (canonicalize-path "./build/libflux.so") "request_render_to_file"
+                            #:return-type void))
+
 (define init-graphics
   ;; TODO: Don't use a brittle path to load the library
   (foreign-library-function (canonicalize-path "./build/libflux.so") "init_graphics"
@@ -61,17 +68,22 @@
     (make-scene scene)
     (promote-staging-scene)))
 
+(define (color->struct colorish)
+  (if (string? colorish)
+      (begin
+        (string->color-struct colorish))
+      (make-color-struct (color-r colorish)
+                         (color-g colorish)
+                         (color-b colorish)
+                         (color-a colorish))))
+
 (define (process-scene-member member)
   (let ((pointer
          (cond
           ((circle? member) (make-circle-struct (circle-pos-x member)
                                                 (circle-pos-y member)
                                                 (circle-radius member)
-                                                (let ((color (circle-color member)))
-                                                  (make-color-struct (color-r color)
-                                                                     (color-g color)
-                                                                     (color-b color)
-                                                                     (color-a color)))))
+                                                (color->struct (circle-color member))))
 
           (else (format #t "Unknown member type: ~s" member)
                 #f))))
@@ -87,3 +99,14 @@
 (define (plist-ref key lst)
   (let ((res (memq key lst)))
     (if res (cadr res) #f)))
+
+(define (string->color-struct hex-string)
+  (let ((r (locale-string->integer (substring hex-string 1 3) 16))
+        (g (locale-string->integer (substring hex-string 3 5) 16))
+        (b (locale-string->integer (substring hex-string 5 7) 16)))
+    (make-color-struct r g b 255)))
+
+(define (render-to-file file-name)
+  ;; (bytevector->pointer (string->bytevector file-name "US-ASCII"))
+  (pretty-print (string->bytevector file-name "US-ASCII"))
+  (request-render-to-file))

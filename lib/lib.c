@@ -4,201 +4,142 @@
 #include <pthread.h>
 #include <SDL.h>
 #include <SDL2_gfxPrimitives.h>
+#include <SDL2/SDL_image.h>
 
-#define INITIAL_MEMBER_SIZE 100
+#include "flux.h"
 
-#define TYPE_CIRCLE 2
+Uint32 set_scene_event_id = -1;
 
-Uint32 scene_event_id = -1;
+Scene *current_scene = NULL;
 
-typedef struct ColorType {
-  Uint8 r;
-  Uint8 g;
-  Uint8 b;
-  Uint8 a;
-} Color;
+SDL_Renderer *renderer = NULL;
 
-typedef struct CircleType {
-  Sint16 x;
-  Sint16 y;
-  Sint16 radius;
-  Color* color;
-} Circle;
+Uint8 save_requested = 0;
+void request_render_to_file() {
+  save_requested = 1;
+}
 
-typedef struct SceneMemberType {
-  Uint32 type;
-  void* props;
-} SceneMember;
+void render_to_file(SDL_Renderer *renderer) {
+  const char *file_name = "output.png";
 
-typedef struct SceneType {
-  Uint32 member_count;
-  SceneMember* members;
-} Scene;
+  // Used temporary variables
+  SDL_Rect viewport;
+  SDL_Surface *surface = NULL;
 
-SceneMember test_member = {
-  .type = TYPE_CIRCLE,
-  .props = &(Circle) {
-    .x = 500,
-    .y = 500,
-    .radius = 400,
-    .color = &(Color) {
-      .r = 255,
-      .g = 0,
-      .b = 0,
-      .a = 255
-    }
+  // Get viewport size
+  SDL_RenderGetViewport(renderer, &viewport);
+
+  // Create SDL_Surface with depth of 32 bits
+  // TODO: Alpha mask?
+  surface = SDL_CreateRGBSurface(0, viewport.w, viewport.h, 32, 0, 0, 0, 0);
+
+  // Check if the surface is created properly
+  if (surface == NULL) {
+    /* std::cout << "Cannot create SDL_Surface: " << SDL_GetError() << std::endl; */
+    return;
+   }
+
+  // Get data from SDL_Renderer and save them into surface
+  if (SDL_RenderReadPixels(renderer, NULL, surface->format->format, surface->pixels, surface->pitch) != 0) {
+    /* std::cout << "Cannot read data from SDL_Renderer: " << SDL_GetError() << std::endl; */
+
+    // Don't forget to free memory
+    SDL_FreeSurface(surface);
+    return;
   }
-};
 
-Scene test_scene = (Scene) {
-  .member_count = 1,
-  .members = &test_member
-};
+  // Save screenshot as PNG file
+  if (IMG_SavePNG(surface, file_name) != 0) {
+    /* std::cout << "Cannot save PNG file: " << SDL_GetError() << std::endl; */
 
-/* Scene* current_scene = &test_scene; */
-Scene* staging_scene = NULL;
-Scene* current_scene = NULL;
+    // Free memory
+    SDL_FreeSurface(surface);
+    return;
+  }
 
-// For each thing in the scene, we need to know
-// - Type of thing to draw
-// - Specific struct of properties for the thing to be drawn
-
-Color* make_color_struct(Uint8 r, Uint8 g, Uint8 b, Uint8 a) {
-  Color* color = malloc(sizeof(Color));
-  color->r = r;
-  color->g = g;
-  color->b = b;
-  color->a = a;
-
-  return color;
+  // Free memory
+  SDL_FreeSurface(surface);
 }
 
-Circle* make_circle_struct(Sint16 x, Sint16 y, Sint16 radius, Color* color) {
-  Circle* circle = malloc(sizeof(Circle));
-  circle->x = x;
-  circle->y = y;
-  circle->radius = radius;
-  circle->color = color;
+void* render_loop(void* arg) {
+  // Create the preview window
+  SDL_Window *window = SDL_CreateWindow("Flux Preview", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 1280, 720, SDL_WINDOW_OPENGL);
 
-  return circle;
-}
+  // Create the renderer for the window
+  renderer = SDL_CreateRenderer(window, -1, 0);
 
-void add_scene_member(Uint32 type, void* props) {
-  // Add the member in the member array
-  // TODO: Check if we've reached the size limit!
-  SceneMember* new_member = &staging_scene->members[staging_scene->member_count++];
-  new_member->type = type;
-  new_member->props = props;
-}
-
-void init_scene() {
-  Scene *new_scene = malloc(sizeof(Scene));
-  new_scene->member_count = 0;
-  new_scene->members = malloc(sizeof(SceneMember) * INITIAL_MEMBER_SIZE);
-
-  // TODO: Synchronize this!
-  staging_scene = new_scene;
-}
-
-void promote_staging_scene() {
+  bool quit = false;
   SDL_Event event;
-  SDL_memset(&event, 0, sizeof(event));
-  event.type = scene_event_id;
-  SDL_PushEvent(&event);
 
-  // TODO: THIS IS BAD!
-  current_scene = staging_scene;
-  init_scene();
-}
+  while (!quit) {
+      SDL_WaitEvent(&event);
 
-void render_filled_circle(SDL_Renderer* renderer, Circle* circle) {
-  // Draw a circle
-  Color* color = circle->color;
-  filledCircleRGBA(renderer, circle->x, circle->y, circle->radius, color->r, color->g, color->b, color->a);
-}
+      /* flux_log("SDL_Event: %d [%d]\n", event.type, set_scene_event_id); */
 
-void render_scene(SDL_Renderer* renderer, Scene* scene) {
-  // Draw the scene
-  for (int i = 0; i < scene->member_count; i++) {
-    switch(scene->members[i].type) {
-      case TYPE_CIRCLE:
-        render_filled_circle(renderer, scene->members[i].props);
-        break;
-    }
+      if (event.type == set_scene_event_id) {
+        flux_log("Received set scene event!\n");
+        flip_current_scene(&current_scene);
+      } else {
+        switch (event.type) {
+          case SDL_QUIT:
+            // TODO: Find a better way to tell the Scheme side to exit gracefully
+            exit(0);
+            quit = true;
+            break;
+        }
+      }
+
+      // Set the fill color to black
+      SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+
+      // Clear the screen before rendering
+      SDL_RenderClear(renderer);
+
+      // Render the scene
+      if (current_scene != NULL) {
+        render_scene(renderer, current_scene);
+      }
+
+      // Save the scene if requested
+      if (save_requested == 1) {
+        save_requested = 0;
+        render_to_file(renderer);
+      }
+
+      // Flip the back buffer
+      SDL_RenderPresent(renderer);
   }
-}
 
-void* init_sdl(void* arg)
-{
-    SDL_Init(SDL_INIT_VIDEO);
+  SDL_Quit();
 
-    // Register custom event for scene flipping
-    scene_event_id = SDL_RegisterEvents(1);
-
-    // Create the preview window
-    SDL_Window *window = SDL_CreateWindow("Flux Preview", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 1280, 720, SDL_WINDOW_OPENGL);
-
-    // Create the renderer for the window
-    SDL_Renderer *renderer = SDL_CreateRenderer(window, -1, 0);
-
-    bool quit = false;
-    SDL_Event event;
-
-    while (!quit) {
-        SDL_WaitEvent(&event);
-
-        if (event.type == scene_event_id) {
-          // TODO: Free the old current_scene!
-          current_scene = staging_scene;
-          init_scene();
-        } else {
-          switch (event.type) {
-            case SDL_QUIT:
-              // TODO: Find a better way to tell the Scheme side to exit gracefully
-              exit(0);
-              quit = true;
-              break;
-          }
-        }
-
-        // Set the fill color to black
-        SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
-
-        // Clear the screen before rendering
-        SDL_RenderClear(renderer);
-
-        // Render the scene
-        if (current_scene != NULL) {
-          render_scene(renderer, current_scene);
-        }
-
-        // Flip the back buffer
-        SDL_RenderPresent(renderer);
-    }
-
-    SDL_Quit();
-
-    return 0;
+  return 0;
 }
 
 pthread_t graphics_thread_handle;
-
-int init_graphics_thread() {
-  // Create the thread for SDL2
-  int rc = pthread_create(&graphics_thread_handle, NULL, init_sdl, NULL);
-}
-
 Uint8 graphics_initialized = 0;
 
 void init_graphics (int width, int height)
 {
+  // Open the log file if it isn't yet
+  open_log("log.txt");
+
   if (graphics_initialized == 0) {
+    flux_log("Initializing graphics thread...\n");
+
     graphics_initialized = 1;
 
-    // Create a blank scene
-    init_scene();
+    SDL_Init(SDL_INIT_VIDEO);
+
+    // Register custom event for scene flipping
+    set_scene_event_id = register_set_scene_event();
+
+    // Create a blank staging scene
+    init_staging_scene();
 
     // TODO: Pass width and height through
-    init_graphics_thread();
+    // Create the thread for SDL2
+    int rc = pthread_create(&graphics_thread_handle, NULL, render_loop, NULL);
+  } else {
+    flux_log("Graphics thread already initialized...\n");
   }
 }
