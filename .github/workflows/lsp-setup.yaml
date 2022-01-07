@@ -2,19 +2,19 @@ name: Check creation of compile_commands.json for LSP
 
 on:
   push:
-    branches: '*'
+    branches: "*"
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout
-      uses: actions/checkout@v2
+      - name: Checkout
+        uses: actions/checkout@v2
 
-    - name: Install dependencies
-      run: |
-        sudo apt-get --no-install-recommends -y install guile-3.0 guile-3.0-dev guile-3.0-libs libsdl2-dev libsdl2-gfx-dev make pkg-config
+      - name: Install dependencies
+        run: |
+          sudo apt-get --no-install-recommends -y install guile-3.0 guile-3.0-dev guile-3.0-libs libsdl2-dev libsdl2-gfx-dev libsdl2-image-dev make pkg-config
 
-    - name: Bootstrap
-      run: ./bootstrap.sh
+      - name: Bootstrap
+        run: ./bootstrap.sh
