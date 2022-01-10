@@ -1,16 +1,17 @@
-#include <libguile.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include "../../lib/flux.h"
 
-static void
-inner_main (void *closure, int argc, char **argv)
-{
-  scm_c_primitive_load("init.scm");
+int main(int argc, char **argv) {
+  FILE *script_file = flux_file_open(
+      "/home/daviwil/Projects/Code/flux-compose/examples/ideas.flx", "r");
 
-  scm_shell(argc, argv);
-}
+  if (script_file == NULL) {
+    printf("Could not load script file!\n");
+    exit(1);
+  }
 
-int
-main (int argc, char **argv)
-{
-  scm_boot_guile (argc, argv, inner_main, 0);
+  flux_script_eval(script_file);
+
   return 0; /* never reached, see inner_main */
 }

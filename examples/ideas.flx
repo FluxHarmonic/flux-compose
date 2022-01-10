@@ -1,0 +1,20 @@
+(module (examples ideas)
+   (import (flux core)
+           (flux memory)))
+
+(define-scene moving-circles
+  (members (circle :name 'circle1
+                   :x 200
+                   :y 500
+                   :color (rgb 255 0 0)))
+
+  (timeline (event :at 0:05
+                   :actions #((move :to (pos 400 200)
+                                    :for 150ms
+                                    :ease 'out)))
+            (event :at 0:10
+                   :actions #((fade :for 1000m)))))
+
+(preview-scene moving-circles)
+
+;; All functions like `circle` are defined in the C layer
