@@ -29,25 +29,36 @@ int is_state(int state, int expected) {
 }
 
 // Return a pointer to the next token
-TokenHeader *flux_script_token_next(TokenHeader *token) {
-  switch (token->kind) {
+TokenHeader *flux_script_token_next(TokenCursor *token_cursor) {
+  TokenHeader *token = token_cursor->current;
+  switch (token_cursor->current->kind) {
   case TokenKindNone:
     // We're already at the end of the token array
-    return token;
+    // TODO: Signal this somehow?
+    break;
   case TokenKindParen:
-    return token + sizeof(TokenParen);
+    token += sizeof(TokenParen);
+    break;
   case TokenKindInteger:
-    return token + sizeof(TokenInteger);
+    token += sizeof(TokenInteger);
+    break;
   case TokenKindFloat:
-    return token + sizeof(TokenFloat);
+    token += sizeof(TokenFloat);
+    break;
   case TokenKindString:
   case TokenKindSymbol:
   case TokenKindKeyword:
-    return token + sizeof(TokenString) + ((TokenString*)token)->length + 1;
+    token += sizeof(TokenString) + ((TokenString*)token)->length + 1;
+    break;
   default:
     // TODO: Panic
     printf("%s: Unhandled token type: %d\n", __func__, token->kind);
   }
+
+  // Update the cursor with the current location
+  token_cursor->current = token;
+
+  return token;
 }
 
 // Tokenize the script source for the provided file stream
@@ -57,6 +68,8 @@ TokenHeader *flux_script_tokenize(FILE *script_file) {
   }
 
   TokenHeader *current_token = script_token_buffer;
+  TokenCursor token_cursor;
+  token_cursor.current = current_token;
 
   short c = 0;
   int token_state = STATE_NONE;
@@ -78,7 +91,7 @@ TokenHeader *flux_script_tokenize(FILE *script_file) {
         str_token->header.kind = TokenKindString;
         str_token->length = str_ptr - &str_buffer[0];
         strcpy(str_token->string, &str_buffer[0]);
-        current_token = flux_script_token_next(current_token);
+        current_token = flux_script_token_next(&token_cursor);
 
         // Reset the string buffer
         str_ptr = &str_buffer[0];
@@ -102,7 +115,7 @@ TokenHeader *flux_script_tokenize(FILE *script_file) {
         symbol_token->header.kind = TokenKindSymbol;
         symbol_token->length = str_ptr - &str_buffer[0];
         strcpy(symbol_token->string, &str_buffer[0]);
-        current_token = flux_script_token_next(current_token);
+        current_token = flux_script_token_next(&token_cursor);
 
         // Is the symbol quoted?
         symbol_token->is_quoted = flux_flag_check(token_state, FLAG_QUOTED);
@@ -127,7 +140,7 @@ TokenHeader *flux_script_tokenize(FILE *script_file) {
         keyword_token->header.kind = TokenKindKeyword;
         keyword_token->length = str_ptr - &str_buffer[0];
         strcpy(keyword_token->string, &str_buffer[0]);
-        current_token = flux_script_token_next(current_token);
+        current_token = flux_script_token_next(&token_cursor);
 
         // Reset the string buffer
         str_ptr = &str_buffer[0];
@@ -148,7 +161,7 @@ TokenHeader *flux_script_tokenize(FILE *script_file) {
         TokenInteger *integer_token = (TokenInteger*)current_token;
         integer_token->header.kind = TokenKindInteger;
         integer_token->number = atoi(str_buffer);
-        current_token = flux_script_token_next(current_token);
+        current_token = flux_script_token_next(&token_cursor);
 
         // Should the number be negative?
         if (flux_flag_check(token_state, FLAG_MINUS)) {
@@ -169,7 +182,7 @@ TokenHeader *flux_script_tokenize(FILE *script_file) {
         TokenParen *paren = (TokenParen*)current_token;
         paren->header.kind = TokenKindParen;
         paren->is_open = 1;
-        current_token = flux_script_token_next(current_token);
+        current_token = flux_script_token_next(&token_cursor);
       } else if (c == ')') {
         // Are we in a string?
         if (token_state == STATE_STRING) {
@@ -179,7 +192,7 @@ TokenHeader *flux_script_tokenize(FILE *script_file) {
         TokenParen *paren = (TokenParen*)current_token;
         paren->header.kind = TokenKindParen;
         paren->is_open = 0;
-        current_token = flux_script_token_next(current_token);
+        current_token = flux_script_token_next(&token_cursor);
       } else if (c == '"') {
         token_state = STATE_STRING;
       } else if (c == ':') {

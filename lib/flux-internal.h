@@ -56,7 +56,11 @@ typedef struct {
   double number;
 } TokenFloat;
 
+typedef struct {
+  TokenHeader *current;
+} TokenCursor;
+
 extern TokenHeader *flux_script_tokenize(FILE *script_file);
-extern TokenHeader *flux_script_token_next(TokenHeader *token);
+extern TokenHeader *flux_script_token_next(TokenCursor *token_cursor);
 
 #endif
