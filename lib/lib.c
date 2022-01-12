@@ -120,9 +120,6 @@ Uint8 graphics_initialized = 0;
 
 void init_graphics (int width, int height)
 {
-  // Open the log file if it isn't yet
-  open_log("log.txt");
-
   if (graphics_initialized == 0) {
     flux_log("Initializing graphics thread...\n");
 

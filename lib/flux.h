@@ -16,8 +16,9 @@ extern FILE *flux_file_from_string(char *file_contents);
 
 // Logging ----------------------------------------
 
-extern void open_log(const char *file_path);
 extern void flux_log(const char *format, ...);
+extern void flux_log_mem(void *ptr, const char *format, ...);
+extern void flux_log_file_set(const char *file_path);
 
 // Scene ------------------------------------------
 
