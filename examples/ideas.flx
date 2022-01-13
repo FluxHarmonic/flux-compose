@@ -1,20 +1,24 @@
-(module (examples ideas)
-   (import (flux core)
-           (flux memory)))
+;; (module (examples ideas)
+;;   (import (flux core)
+;;           (flux memory)))
 
-(define-scene moving-circles
-  (members (circle :name 'circle1
-                   :x 200
-                   :y 500
-                   :color (rgb 255 0 0)))
+(define font-jost (font :family "Jost*" :weight 'medium))
 
-  (timeline (event :at 0:05
-                   :actions #((move :to (pos 400 200)
-                                    :for 150ms
-                                    :ease 'out)))
-            (event :at 0:10
-                   :actions #((fade :for 1000m)))))
+(define moving-circles
+  (scene :members
+         (list (circle :name 'circle1
+                       :x 200
+                       :y 500
+                       :color (rgb 255 0 0)))
+
+         :timeline
+         (list (event :at 0:05
+                      :actions (list (move :target 'circle1
+                                           :to (pos 400 200)
+                                           :for 150ms
+                                           :ease 'out)))
+               (event :at 0:10
+                      :actions (list (fade :target 'circle1
+                                           :for 1000m)))))
 
 (preview-scene moving-circles)
-
-;; All functions like `circle` are defined in the C layer
