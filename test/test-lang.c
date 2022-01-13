@@ -204,12 +204,31 @@ void test_lang_tokenize_expressions() {
   PASS();
 }
 
+void test_lang_tokenize_single_symbol_list() {
+  TokenCursor token_cursor;
+  TokenHeader *token = tokenize("(circle)", &token_cursor);
+
+  ASSERT_KIND(token, TokenKindParen);
+  ASSERT_EQ(1, ((TokenParen*)token)->is_open);
+
+  token = flux_script_token_next(&token_cursor);
+  ASSERT_KIND(token, TokenKindSymbol);
+  ASSERT_STR("circle", ((TokenSymbol*)token)->string);
+
+  token = flux_script_token_next(&token_cursor);
+  ASSERT_KIND(token, TokenKindParen);
+  ASSERT_EQ(0, ((TokenParen*)token)->is_open);
+
+  token = flux_script_token_next(&token_cursor);
+  ASSERT_KIND(token, TokenKindNone);
+
+  PASS();
+}
+
 void test_lang_parse_list() {
   ExprHeader *expr = NULL;
   ExprListCursor list_cursor;
   parse("(circle :name \"circle1\" :x 200 :y -15)", &list_cursor);
-
-  printf("--- START CHECKS\n");
 
   // Every result is wrapped in a top-level list
   expr = flux_script_expr_list_next(&list_cursor);
@@ -221,62 +240,60 @@ void test_lang_parse_list() {
 
   // circle
   expr = flux_script_expr_list_next(&sub_list_cursor);
-  flux_log_mem(expr, "Check for symbol!\n");
   ASSERT_EQ(ExprKindSymbol, expr->kind);
   ASSERT_STR("circle", ((ExprSymbol *)expr)->name);
 
   // :name
   expr = flux_script_expr_list_next(&sub_list_cursor);
-  flux_log_mem(expr, "Check for keyword!\n");
   ASSERT_EQ(ExprKindKeyword, expr->kind);
   ASSERT_STR("name", ((ExprKeyword *)expr)->name);
 
   // "circle1"
   expr = flux_script_expr_list_next(&sub_list_cursor);
-  flux_log_mem(expr, "Check for string!\n");
   ASSERT_EQ(ExprKindValue, ((ExprValue *)expr)->header.kind);
   ASSERT_EQ(ValueKindString, ((ExprValue *)expr)->value.kind);
   ASSERT_STR("circle1", ((ValueString*)&((ExprValue *)expr)->value)->string);
 
   // :x
   expr = flux_script_expr_list_next(&sub_list_cursor);
-  flux_log_mem(expr, "Check for keyword!\n");
   ASSERT_EQ(ExprKindKeyword, expr->kind);
   ASSERT_STR("x", ((ExprKeyword *)expr)->name);
 
   // 200
   expr = flux_script_expr_list_next(&sub_list_cursor);
-  flux_log_mem(expr, "Check for integer!\n");
   ASSERT_EQ(ExprKindValue, ((ExprValue *)expr)->header.kind);
   ASSERT_EQ(ValueKindInteger, ((ExprValue *)expr)->value.kind);
   ASSERT_INT_VALUE(((ExprValue *)expr)->value, 200);
 
   // :y
   expr = flux_script_expr_list_next(&sub_list_cursor);
-  flux_log_mem(expr, "Check for keyword!\n");
   ASSERT_EQ(ExprKindKeyword, expr->kind);
   ASSERT_STR("y", ((ExprKeyword *)expr)->name);
 
   // -15
   expr = flux_script_expr_list_next(&sub_list_cursor);
-  flux_log_mem(expr, "Check for integer!\n");
   ASSERT_EQ(ExprKindValue, expr->kind);
   ASSERT_EQ(ValueKindInteger, ((ExprValue *)expr)->value.kind);
   ASSERT_INT_VALUE(((ExprValue *)expr)->value, -15);
 
   expr = flux_script_expr_list_next(&sub_list_cursor);
-  flux_log_mem(expr, "Check end of sequence!\n");
   ASSERT_EQ(ExprKindNone, expr->kind);
-
-  printf("After check\n");
 }
 
 void test_lang_parse_multiple_exprs() {
-  FAIL("Not implemented yet.");
+  ExprHeader *expr = NULL;
+  ExprListCursor list_cursor;
+  parse("(circle 200) (do-something)", &list_cursor);
+
+  /* FAIL("Not implemented yet."); */
 }
 
 void test_lang_parse_nested_lists() {
-  FAIL("Not implemented yet.");
+  ExprHeader *expr = NULL;
+  ExprListCursor list_cursor;
+  parse("(circle :color (rgb 255 0 0))", &list_cursor);
+
+  /* FAIL("Not implemented yet."); */
 }
 
 void test_lang_suite() {
@@ -291,6 +308,7 @@ void test_lang_suite() {
   test_lang_tokenize_keywords();
   test_lang_tokenize_numbers();
   test_lang_tokenize_expressions();
+  test_lang_tokenize_single_symbol_list();
 
   test_lang_parse_list();
   test_lang_parse_multiple_exprs();
