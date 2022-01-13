@@ -60,4 +60,11 @@ extern void render_scene(SDL_Renderer *, Scene *);
 extern unsigned int flux_script_eval(FILE *script_file);
 extern unsigned int flux_script_eval_string(char *script_string);
 
+// Utils --------------------------------------------
+
+#define PANIC(message, ...)                                        \
+  flux_log("\n\e[1;31mPANIC\e[0m in \e[0;93m%s\e[0m: ", __func__); \
+  flux_log(message, __VA_ARGS__);                                  \
+  exit(1);
+
 #endif

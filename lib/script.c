@@ -53,8 +53,7 @@ TokenHeader *flux_script_token_next(TokenCursor *token_cursor) {
     token += sizeof(TokenString) + ((TokenString*)token)->length + 1;
     break;
   default:
-    // TODO: Panic
-    printf("%s: Unhandled token type: %d\n", __func__, token->kind);
+    PANIC("Unhandled token type: %d\n", token->kind);
   }
 
   // Update the cursor with the current location
@@ -241,8 +240,7 @@ size_t flux_script_value_size(ValueHeader *value) {
   case ValueKindString:
     return sizeof(ValueString) + ((ValueString*)value)->length + 1;
   default:
-    // TODO: Panic
-    printf("%s: Unhandled value type: %d\n", __func__, value->kind);
+    PANIC("Unhandled value type: %d\n", value->kind);
   }
 }
 
@@ -291,8 +289,7 @@ ExprHeader *flux_script_expr_list_next(ExprListCursor *list_cursor) {
     break;
 
   default:
-    // TODO: Panic
-    printf("%s: Unhandled expr type: %d\n", __func__, expr->kind);
+    PANIC("Unhandled expr type: %d\n", expr->kind);
   }
 
   flux_log_mem(expr, "NEXT item: %x (moved %d)\n", list_cursor->current, list_cursor->current - expr);
