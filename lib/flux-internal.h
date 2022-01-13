@@ -93,6 +93,13 @@ typedef struct {
   void* entity;
 } ValueEntity;
 
+typedef struct {
+  ValueHeader *current;
+} ValueCursor;
+
+typedef struct {
+  ValueHeader header;
+} ValueFunctionPtr;
 
 typedef enum {
   ExprKindNone,
@@ -144,5 +151,6 @@ extern TokenHeader *flux_script_token_next(TokenCursor *token_cursor);
 extern ExprHeader *flux_script_expr_list_next(ExprListCursor *iterator);
 extern ExprList *flux_script_parse(TokenHeader *start_token);
 extern void *flux_script_expr_list_cursor_init(ExprList *list, ExprListCursor *list_cursor);
+extern ValueHeader *flux_script_eval_expr(ExprHeader *expr, ValueCursor *value_cursor);
 
 #endif

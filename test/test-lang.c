@@ -58,6 +58,17 @@ ExprList *parse(char *input, ExprListCursor *list_cursor) {
   return list_cursor->list;
 }
 
+ValueHeader *eval(char *input) {
+  FILE *stream = flux_file_from_string(input);
+  TokenHeader *token = flux_script_tokenize(stream);
+  fclose(stream);
+
+  // Eval the resulting expression and return it
+  ValueCursor value_cursor;
+  ExprList *result = flux_script_parse(token);
+  return flux_script_eval_expr((ExprHeader *)&result->items[0], &value_cursor);
+}
+
 void test_lang_tokenize_empty() {
   TokenCursor token_cursor;
   TokenHeader *token = tokenize("   ", &token_cursor);
@@ -296,6 +307,34 @@ void test_lang_parse_nested_lists() {
   /* FAIL("Not implemented yet."); */
 }
 
+void test_lang_eval_integer() {
+  ValueHeader *value = eval("311");
+
+  ASSERT_EQ(ValueKindInteger, value->kind);
+  // TODO: I shouldn't have to dereference this, rethink the macro
+  ASSERT_INT_VALUE(*value, 311);
+
+  PASS();
+}
+
+void test_lang_eval_string() {
+  ValueHeader *value = eval("\"Flux Harmonic\"");
+
+  ASSERT_EQ(ValueKindString, value->kind);
+  ASSERT_STR("Flux Harmonic", ((ValueString *)value)->string);
+
+  PASS();
+}
+
+void test_lang_eval_basic_call() {
+  ValueHeader *value = eval("(add 1 2)");
+
+  /* ASSERT_EQ(ValueKindString, value->kind); */
+  /* ASSERT_STR("Flux Harmonic", ((ValueString *)value)->string); */
+
+  PASS();
+}
+
 void test_lang_suite() {
   SUITE();
 
@@ -313,4 +352,8 @@ void test_lang_suite() {
   test_lang_parse_list();
   test_lang_parse_multiple_exprs();
   test_lang_parse_nested_lists();
+
+  test_lang_eval_integer();
+  test_lang_eval_string();
+  test_lang_eval_basic_call();
 }
