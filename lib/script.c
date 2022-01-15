@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <string.h>
+#include <stdint.h>
 #include "flux.h"
 #include "flux-internal.h"
 
@@ -13,20 +14,21 @@ void *script_value_buffer = NULL;
 
 // TODO: Use an option or compiler directive to disable these
 
-#define TOKEN_LOG(ptr, message, ...) \
-  flux_log_mem(ptr, "TOKEN | ");     \
-  flux_log(message __VA_OPT__(,) __VA_ARGS__);
+/* #define TOKEN_LOG(ptr, message, ...) \ */
+/*   flux_log_mem(ptr, "TOKEN | ");     \ */
+/*   flux_log(message __VA_OPT__(,) __VA_ARGS__); */
 
-#define PARSE_LOG(ptr, message, ...) \
-  flux_log_mem(ptr, "PARSE | ");     \
-  flux_log(message __VA_OPT__(,) __VA_ARGS__);
+/* #define PARSE_LOG(ptr, message, ...) \ */
+/*   flux_log_mem(ptr, "PARSE | ");     \ */
+/*   flux_log(message __VA_OPT__(,) __VA_ARGS__); */
 
-#define EVAL_LOG(ptr, message, ...)  \
-  flux_log_mem(ptr, "EVAL  | ");     \
-  flux_log(message __VA_OPT__(,) __VA_ARGS__);
+/* #define EVAL_LOG(ptr, message, ...)  \ */
+/*   flux_log_mem(ptr, "EVAL  | ");     \ */
+/*   flux_log(message __VA_OPT__(,) __VA_ARGS__); */
 
-/* #define TOKEN_LOG(ptr, message, ...) {} */
-/* #define PARSE_LOG(ptr, message, ...) {} */
+#define TOKEN_LOG(ptr, message, ...) {}
+#define PARSE_LOG(ptr, message, ...) {}
+#define EVAL_LOG(ptr, message, ...) {}
 
 typedef enum {
   TSTATE_NONE,
@@ -62,22 +64,22 @@ TokenHeader *flux_script_token_next(TokenCursor *token_cursor) {
     TOKEN_LOG(token, "Can't move forward, already at the last token!\n");
     break;
   case TokenKindParen:
-    token += sizeof(TokenParen);
+    token += 1;
     break;
   case TokenKindInteger:
-    token += sizeof(TokenInteger);
+    token += 1;
     break;
   case TokenKindFloat:
-    token += sizeof(TokenFloat);
+    token += 1;
     break;
   case TokenKindString:
-    token += sizeof(TokenString) + ((TokenString *)token)->length + 1;
+    token = (TokenHeader *)((uintptr_t)token + sizeof(TokenString) + ((TokenString*)token)->length + 1);
     break;
   case TokenKindSymbol:
-    token += sizeof(TokenSymbol) + ((TokenSymbol *)token)->length + 1;
+    token = (TokenHeader *)((uintptr_t)token + sizeof(TokenSymbol) + ((TokenSymbol*)token)->length + 1);
     break;
   case TokenKindKeyword:
-    token += sizeof(TokenKeyword) + ((TokenKeyword *)token)->length + 1;
+    token = (TokenHeader *)((uintptr_t)token + sizeof(TokenKeyword) + ((TokenKeyword*)token)->length + 1);
     break;
   default:
     PANIC("Unhandled token type: %d\n", token->kind);
@@ -303,12 +305,14 @@ ExprHeader *flux_script_expr_list_next(ExprListCursor *list_cursor) {
   ExprHeader *sub_expr = NULL;
   ExprListCursor sub_list_cursor;
 
+  PARSE_LOG(expr, "Next expr requested, current kind: %d\n", expr->kind);
+
   switch(expr->kind) {
   case ExprKindList:
     PARSE_LOG(expr, "Item is List\n");
 
     // Loop over the sub-list to get the position after the list is complete
-    flux_script_expr_list_cursor_init(expr, &sub_list_cursor);
+    flux_script_expr_list_cursor_init((ExprList *)expr, &sub_list_cursor);
     PARSE_LOG(expr, "Sub list length %d\n", sub_list_cursor.list->length);
     do {
       sub_expr = flux_script_expr_list_next(&sub_list_cursor);
@@ -321,17 +325,17 @@ ExprHeader *flux_script_expr_list_next(ExprListCursor *list_cursor) {
 
   case ExprKindSymbol:
     PARSE_LOG(expr, "Item is Symbol\n");
-    list_cursor->current = expr + sizeof(ExprSymbol) + ((ExprSymbol*)expr)->length + 1;
+    list_cursor->current = (ExprHeader*)((uintptr_t)expr + sizeof(ExprSymbol) + ((ExprSymbol*)expr)->length + 1);
     break;
 
   case ExprKindKeyword:
     PARSE_LOG(expr, "Item is Keyword\n");
-    list_cursor->current = expr + sizeof(ExprKeyword) + ((ExprKeyword*)expr)->length + 1;
+    list_cursor->current = (ExprHeader*)((uintptr_t)expr + sizeof(ExprKeyword) + ((ExprKeyword*)expr)->length + 1);
     break;
 
   case ExprKindValue:
     PARSE_LOG(expr, "Item is Value\n");
-    list_cursor->current = expr + sizeof(ExprHeader) + flux_script_value_size(&(((ExprValue *)expr)->value));
+    list_cursor->current = (ExprHeader*)((uintptr_t)expr + sizeof(ExprHeader) + flux_script_value_size(&(((ExprValue *)expr)->value)));
     break;
 
   default:
@@ -437,8 +441,7 @@ ExprList *flux_script_parse_list(TokenCursor *token_cursor, ExprListCursor *list
       // Set the value
       ValueInteger *int_value = (ValueInteger *)&(integer->value);
       int_value->header.kind = ValueKindInteger;
-      // TODO: Somehow this is setting the token kind!  WAT
-      /* int_value->value = ((TokenInteger *)token)->number; */
+      int_value->value = ((TokenInteger *)token)->number;
 
       // Move the cursor forward
       flux_script_expr_list_next(list_cursor);
@@ -521,13 +524,13 @@ ValueHeader *flux_script_value_next(ValueCursor *value_cursor) {
     EVAL_LOG(value, "Can't move forward, already at the last value!\n");
     break;
   case ValueKindInteger:
-    value += sizeof(ValueInteger);
+    value += 1;
     break;
   case ValueKindFloat:
-    value += sizeof(ValueFloat);
+    value += 1;
     break;
   case ValueKindString:
-    value += sizeof(ValueString) + ((ValueString *)value)->length + 1;
+    value = (ValueHeader *)((uintptr_t)value + sizeof(ValueString) + ((ValueString*)value)->length + 1);
     break;
   default:
     PANIC("Unhandled value type: %d\n", value->kind);
@@ -548,9 +551,11 @@ ValueHeader *flux_script_value_copy(ValueHeader *value, ValueCursor *value_curso
   case ValueKindInteger:
     EVAL_LOG(value, "Copying integer %d to %x\n", ((ValueInteger *)value)->value, new_value);
     memcpy(new_value, value, sizeof(ValueInteger));
+    break;
   case ValueKindString:
     EVAL_LOG(value, "Copying string \"%s\" to %x\n", ((ValueString *)value)->string, new_value);
     memcpy(new_value, value, sizeof(ValueString) + ((ValueString *)value)->length + 1);
+    break;
   }
 
   // Prepare the next cursor location
@@ -566,7 +571,8 @@ ValueHeader *flux_script_func_add(ExprListCursor *list_cursor, ValueCursor *valu
   // Iterate over the remaining expressions, evaluate them, and do some work
   // TODO: Don't limit the numbre of inputs
   for (i = 0; i < 2; i++) {
-    flux_script_expr_list_next(&list_cursor);
+    EVAL_LOG(list_cursor->current, "INSIDE LOOP: %d %d\n", i, list_cursor->current->kind);
+    flux_script_expr_list_next(list_cursor);
     ValueHeader *result = flux_script_eval_expr(list_cursor->current, value_cursor);
     // TODO: Verify that it's an integer
     sum += ((ValueInteger *)result)->value;
@@ -598,12 +604,11 @@ ValueHeader *flux_script_eval_expr(ExprHeader *expr, ValueCursor *value_cursor) 
   case ExprKindValue:
     return flux_script_value_copy(&((ExprValue*)expr)->value, value_cursor);
   case ExprKindList:
+    // Initialize the cursor for the expression
     ExprListCursor arg_cursor;
-    arg_cursor.index = 0;
-    arg_cursor.list = ((ExprList *)expr)->items;
+    flux_script_expr_list_cursor_init(expr, &arg_cursor);
     flux_script_expr_list_next(&arg_cursor);
 
-    /* return flux_script_value_copy(&((ExprValue*)expr)->value, value_cursor); */
     // First of all, grab the symbol at the beginning of the list
     ExprHeader *call_symbol = &((ExprList *)expr)->items[0];
 
@@ -614,6 +619,8 @@ ValueHeader *flux_script_eval_expr(ExprHeader *expr, ValueCursor *value_cursor) 
     // TODO: Check that it's a symbol
     if (call_symbol->kind == ExprKindSymbol) {
       char *symbol_name = ((ExprSymbol *)call_symbol)->name;
+      EVAL_LOG(call_symbol, "Call expr with symbol: %s\n", symbol_name);
+
       if (strcmp(symbol_name, "add") == 0) {
         return flux_script_func_add(&arg_cursor, value_cursor);
       }
@@ -628,17 +635,19 @@ ValueHeader *flux_script_eval_expr(ExprHeader *expr, ValueCursor *value_cursor) 
   return NULL;
 }
 
-unsigned int flux_script_eval(FILE *script_file) {
+ValueHeader *flux_script_eval(FILE *script_file) {
   TokenHeader *first_token = flux_script_tokenize(script_file);
   if (first_token != NULL) {
-    return flux_script_parse(first_token);
+    ValueCursor value_cursor;
+    ExprList *result = flux_script_parse(first_token);
+    return flux_script_eval_expr((ExprHeader *)result, &value_cursor);
   }
 
   // TODO: Better return type
-  return 1;
+  return NULL;
 }
 
-unsigned int flux_script_eval_string(char *script_string) {
+ValueHeader *flux_script_eval_string(char *script_string) {
   FILE *stream = flux_file_from_string(script_string);
   flux_script_eval(stream);
 }

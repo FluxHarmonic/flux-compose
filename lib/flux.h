@@ -57,8 +57,45 @@ extern void render_scene(SDL_Renderer *, Scene *);
 
 // Scripting ----------------------------------------
 
-extern unsigned int flux_script_eval(FILE *script_file);
-extern unsigned int flux_script_eval_string(char *script_string);
+typedef enum {
+  ValueKindNone,
+  ValueKindInteger,
+  ValueKindFloat,
+  ValueKindString,
+  ValueKindEntity,
+} ValueKind;
+
+typedef struct {
+  ValueKind kind;
+} ValueHeader;
+
+typedef struct {
+  ValueHeader header;
+  int value;
+} ValueInteger;
+
+typedef struct {
+  ValueHeader header;
+  float value;
+} ValueFloat;
+
+typedef struct {
+  ValueHeader header;
+  unsigned int length;
+  char string[];
+} ValueString;
+
+typedef struct {
+  ValueHeader header;
+  void* entity;
+} ValueEntity;
+
+typedef struct {
+  ValueHeader header;
+} ValueFunctionPtr;
+
+extern ValueHeader *flux_script_eval(FILE *script_file);
+extern ValueHeader *flux_script_eval_string(char *script_string);
 
 // Utils --------------------------------------------
 

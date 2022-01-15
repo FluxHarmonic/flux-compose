@@ -60,46 +60,9 @@ typedef struct {
   TokenHeader *current;
 } TokenCursor;
 
-typedef enum {
-  ValueKindNone,
-  ValueKindInteger,
-  ValueKindFloat,
-  ValueKindString,
-  ValueKindEntity,
-} ValueKind;
-
-typedef struct {
-  ValueKind kind;
-} ValueHeader;
-
-typedef struct {
-  ValueHeader header;
-  int value;
-} ValueInteger;
-
-typedef struct {
-  ValueHeader header;
-  double value;
-} ValueFloat;
-
-typedef struct {
-  ValueHeader header;
-  unsigned int length;
-  char string[];
-} ValueString;
-
-typedef struct {
-  ValueHeader header;
-  void* entity;
-} ValueEntity;
-
 typedef struct {
   ValueHeader *current;
 } ValueCursor;
-
-typedef struct {
-  ValueHeader header;
-} ValueFunctionPtr;
 
 typedef enum {
   ExprKindNone,

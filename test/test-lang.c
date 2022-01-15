@@ -329,8 +329,8 @@ void test_lang_eval_string() {
 void test_lang_eval_basic_call() {
   ValueHeader *value = eval("(add 1 2)");
 
-  /* ASSERT_EQ(ValueKindString, value->kind); */
-  /* ASSERT_STR("Flux Harmonic", ((ValueString *)value)->string); */
+  ASSERT_EQ(ValueKindInteger, value->kind);
+  ASSERT_INT_VALUE(*value, 3);
 
   PASS();
 }
