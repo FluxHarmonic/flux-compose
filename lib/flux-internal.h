@@ -48,12 +48,12 @@ typedef TokenString TokenKeyword;
 
 typedef struct {
   TokenHeader header;
-  long number;
+  int number;
 } TokenInteger;
 
 typedef struct {
   TokenHeader header;
-  double number;
+  float number;
 } TokenFloat;
 
 typedef struct {
