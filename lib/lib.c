@@ -7,6 +7,7 @@
 #include <SDL2/SDL_image.h>
 
 #include "flux.h"
+#include "flux-internal.h"
 
 Uint32 set_scene_event_id = -1;
 
@@ -139,4 +140,14 @@ void init_graphics (int width, int height)
   } else {
     flux_log("Graphics thread already initialized...\n");
   }
+}
+
+ValueHeader *flux_graphics_func_show_preview_window(ExprListCursor *list_cursor, ValueCursor *value_cursor) {
+  flux_log("ATTEMPTING TO LOAD WINDOW\n");
+
+  // TODO: Pass actual width and height
+  init_graphics(1280, 720);
+
+  // TODO: Is this appropriate
+  return NULL;
 }

@@ -520,7 +520,7 @@ ValueHeader *flux_script_func_add(ExprListCursor *list_cursor, ValueCursor *valu
   for (i = 0; i < 2; i++) {
     EVAL_LOG(list_cursor->current, "INSIDE LOOP: %d %d\n", i, list_cursor->current->kind);
     flux_script_expr_list_next(list_cursor);
-    ValueHeader *result = flux_script_eval_expr(list_cursor->current, value_cursor);
+    ValueHeader *result = flux_script_eval_expr(list_cursor->current);
     // TODO: Verify that it's an integer
     sum += ((ValueInteger *)result)->value;
   }
@@ -534,45 +534,51 @@ ValueHeader *flux_script_func_add(ExprListCursor *list_cursor, ValueCursor *valu
   return (ValueHeader *)result;
 }
 
-ValueHeader *flux_script_eval_expr(ExprHeader *expr, ValueCursor *value_cursor) {
+ValueHeader *flux_script_eval_expr(ExprHeader *expr) {
+  ValueCursor value_cursor;
+
   // Allocate the parse buffer if necessary
   if (script_value_buffer == NULL) {
     script_value_buffer = flux_memory_alloc(VALUE_BUFFER_INITIAL_SIZE);
     EVAL_LOG(script_value_buffer, "Allocated %d bytes for value buffer\n", VALUE_BUFFER_INITIAL_SIZE);
-
-    // TODO: This may not be the best place to initialize this
-    value_cursor->current = script_value_buffer;
-    value_cursor->current->kind = 0;
   }
 
-  EVAL_LOG(value_cursor->current, "Eval expr kind %d\n", expr->kind);
+  value_cursor.current = script_value_buffer;
+  value_cursor.current->kind = 0;
+
+  EVAL_LOG(value_cursor.current, "Eval expr kind %d\n", expr->kind);
 
   switch (expr->kind) {
   case ExprKindValue:
-    return flux_script_value_copy(&((ExprValue*)expr)->value, value_cursor);
+    return flux_script_value_copy(&((ExprValue*)expr)->value, &value_cursor);
   case ExprKindList:
     // Initialize the cursor for the expression
     ExprListCursor arg_cursor;
-    flux_script_expr_list_cursor_init(expr, &arg_cursor);
-    flux_script_expr_list_next(&arg_cursor);
 
     // First of all, grab the symbol at the beginning of the list
-    ExprHeader *call_symbol = &((ExprList *)expr)->items[0];
+    flux_script_expr_list_cursor_init(expr, &arg_cursor);
+    ExprHeader *call_symbol = flux_script_expr_list_next(&arg_cursor);
 
     // Look up symbol
     // Make sure it's a funciton pointer
     // Invoke it with a cursor for the ExprList
 
     // TODO: Check that it's a symbol
+    EVAL_LOG(call_symbol, "Call symbol kind: %d\n", call_symbol->kind);
+
     if (call_symbol->kind == ExprKindSymbol) {
       char *symbol_name = ((ExprSymbol *)call_symbol)->name;
       EVAL_LOG(call_symbol, "Call expr with symbol: %s\n", symbol_name);
 
       if (strcmp(symbol_name, "add") == 0) {
-        return flux_script_func_add(&arg_cursor, value_cursor);
+        return flux_script_func_add(&arg_cursor, &value_cursor);
+      } else if (strcmp(symbol_name, "show-preview-window") == 0) {
+        return flux_graphics_func_show_preview_window(&arg_cursor, &value_cursor);
+      } else if (strcmp(symbol_name, "circle") == 0) {
+        return flux_graphics_func_circle(&arg_cursor, &value_cursor);
       }
     } else {
-      PANIC("Call expression has expr of kind %d in first position!", call_symbol->kind);
+      PANIC("Call expression has expr of kind %d in first position!\n", call_symbol->kind);
     }
 
     return NULL;
@@ -585,9 +591,14 @@ ValueHeader *flux_script_eval_expr(ExprHeader *expr, ValueCursor *value_cursor) 
 ValueHeader *flux_script_eval(FILE *script_file) {
   Vector token_vector = flux_script_tokenize(script_file);
   if (token_vector != NULL && token_vector->length > 0) {
+    // TODO: Loop over every expression at top-level and eval individually
     ValueCursor value_cursor;
+    ExprListCursor list_cursor;
     ExprList *result = flux_script_parse(token_vector);
-    return flux_script_eval_expr((ExprHeader *)result, &value_cursor);
+    flux_script_expr_list_cursor_init(result, &list_cursor);
+
+    ExprHeader *next_expr = flux_script_expr_list_next(&list_cursor);
+    return flux_script_eval_expr(next_expr);
   }
 
   // TODO: Better return type

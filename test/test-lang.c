@@ -66,7 +66,7 @@ ValueHeader *eval(char *input) {
   // Eval the resulting expression and return it
   ValueCursor value_cursor;
   ExprList *result = flux_script_parse(token);
-  return flux_script_eval_expr((ExprHeader *)&result->items[0], &value_cursor);
+  return flux_script_eval_expr((ExprHeader *)&result->items[0]);
 }
 
 void test_lang_tokenize_empty() {

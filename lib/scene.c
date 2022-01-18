@@ -3,6 +3,7 @@
 #include <SDL2_gfxPrimitives.h>
 
 #include "flux.h"
+#include "flux-internal.h"
 
 // Constants
 #define INITIAL_MEMBER_SIZE 100
@@ -32,6 +33,33 @@ Circle* make_circle_struct(Sint16 x, Sint16 y, Sint16 radius, Color* color) {
   circle->color = color;
 
   return circle;
+}
+
+ValueHeader *flux_graphics_func_circle(ExprListCursor *list_cursor, ValueCursor *value_cursor) {
+  Sint16 x = 0, y = 0, radius = 0;
+  Color *color = NULL;
+
+  // Read values from K/V pairs
+  // TODO: Have a better end state to check for
+  ExprHeader *expr = flux_script_expr_list_next(list_cursor);
+  while (list_cursor->current != ExprKindNone) {
+    if (expr->kind == ExprKindKeyword) {
+      // TODO: Check for none
+      ExprHeader *value = flux_script_expr_list_next(list_cursor);
+
+      // Which keyword name is it
+      if (strcmp(((ExprKeyword*)expr)->name, "name") == 0) {
+        flux_log("Found a name keyword! %s\n", ((ExprSymbol*)value)->name);
+      }
+
+      // Find the value
+    }
+
+    expr = flux_script_expr_list_next(list_cursor);
+  }
+
+  // TODO: Wrap this in a value type
+  make_circle_struct(x, y, radius, color);
 }
 
 Uint32 scene_event_id = -1;

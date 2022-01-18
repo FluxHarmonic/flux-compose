@@ -7,7 +7,7 @@ find_package(PkgConfig REQUIRED)
 #########################################
 # flux-compose executable
 
-add_executable(flux-compose src/core/main.c)
+add_executable(flux-compose src/core/main.c src/core/repl.c)
 target_link_libraries(flux-compose PUBLIC flux)
 
 #########################################
