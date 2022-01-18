@@ -1,8 +1,17 @@
 #ifndef __FLUX_INTERNAL_H
 #define __FLUX_INTERNAL_H
 
-#include <stdio.h>
 #include "flux.h"
+#include <stdio.h>
+
+// Vector -------------------------------------------
+
+struct _Vector {
+  uint32_t length;
+  void *start_item;
+  size_t buffer_size;
+  VectorItemSizeFunc item_size_func;
+};
 
 // Scripting ----------------------------------------
 
@@ -109,10 +118,10 @@ typedef struct {
   ExprHeader *current;
 } ExprListCursor;
 
-extern TokenHeader *flux_script_tokenize(FILE *script_file);
+extern Vector flux_script_tokenize(FILE *script_file);
 extern TokenHeader *flux_script_token_next(TokenCursor *token_cursor);
 extern ExprHeader *flux_script_expr_list_next(ExprListCursor *iterator);
-extern ExprList *flux_script_parse(TokenHeader *start_token);
+extern ExprList *flux_script_parse(Vector token_vector);
 extern void *flux_script_expr_list_cursor_init(ExprList *list, ExprListCursor *list_cursor);
 extern ValueHeader *flux_script_eval_expr(ExprHeader *expr, ValueCursor *value_cursor);
 

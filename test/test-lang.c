@@ -34,24 +34,24 @@
 /*     FAIL("Expected number: %f\n                  got: %f", expected, _token->number);    \ */
 /*   } */
 
-TokenHeader *tokenize(char *input, TokenCursor *cursor) {
+TokenHeader *tokenize(char *input, VectorCursor *cursor) {
   FILE *stream = flux_file_from_string(input);
-  TokenHeader *token = flux_script_tokenize(stream);
+  Vector token_vector = flux_script_tokenize(stream);
   fclose(stream);
 
   // Set up the cursor
-  cursor->current = token;
+  flux_vector_cursor_init(token_vector, cursor);
 
-  return token;
+  return flux_vector_cursor_next(cursor);
 }
 
 ExprList *parse(char *input, ExprListCursor *list_cursor) {
   FILE *stream = flux_file_from_string(input);
-  TokenHeader *token = flux_script_tokenize(stream);
+  Vector token_vector = flux_script_tokenize(stream);
   fclose(stream);
 
   // Set up the cursor
-  list_cursor->list = flux_script_parse(token);
+  list_cursor->list = flux_script_parse(token_vector);
   list_cursor->current = NULL;
   list_cursor->index = 0;
 
@@ -70,7 +70,7 @@ ValueHeader *eval(char *input) {
 }
 
 void test_lang_tokenize_empty() {
-  TokenCursor token_cursor;
+  VectorCursor token_cursor;
   TokenHeader *token = tokenize("   ", &token_cursor);
 
   ASSERT_KIND(token, TokenKindNone);
@@ -79,159 +79,156 @@ void test_lang_tokenize_empty() {
 }
 
 void test_lang_tokenize_parens() {
-  TokenCursor token_cursor;
+  VectorCursor token_cursor;
   TokenHeader *token = tokenize("()", &token_cursor);
 
   ASSERT_KIND(token, TokenKindParen);
 
-  token = flux_script_token_next(&token_cursor);
+  token = flux_vector_cursor_next(&token_cursor);
   ASSERT_KIND(token, TokenKindParen);
 
-  token = flux_script_token_next(&token_cursor);
-  ASSERT_KIND(token, TokenKindNone);
+  ASSERT_INT(0, flux_vector_cursor_has_next(&token_cursor));
 
   PASS();
 }
 
 void test_lang_tokenize_strings() {
-  TokenCursor token_cursor;
+  VectorCursor token_cursor;
   TokenHeader *token = tokenize("\"Hello world!\"", &token_cursor);
 
   ASSERT_KIND(token, TokenKindString);
-  ASSERT_STR("Hello world!", ((TokenString*)token)->string);
+  ASSERT_STR("Hello world!", ((TokenString *)token)->string);
 
-  token = flux_script_token_next(&token_cursor);
-  ASSERT_KIND(token, TokenKindNone);
+  ASSERT_INT(0, flux_vector_cursor_has_next(&token_cursor));
 
   PASS();
 }
 
 void test_lang_tokenize_symbols() {
-  TokenCursor token_cursor;
+  VectorCursor token_cursor;
   TokenHeader *token = tokenize("hello-world 'hello_world h3ll0w0rld", &token_cursor);
 
   ASSERT_KIND(token, TokenKindSymbol);
-  ASSERT_STR("hello-world", ((TokenSymbol*)token)->string);
-  ASSERT_EQ(0, ((TokenSymbol*)token)->is_quoted);
+  ASSERT_STR("hello-world", ((TokenSymbol *)token)->string);
+  ASSERT_EQ(0, ((TokenSymbol *)token)->is_quoted);
 
-  token = flux_script_token_next(&token_cursor);
+  token = flux_vector_cursor_next(&token_cursor);
   ASSERT_KIND(token, TokenKindSymbol);
-  ASSERT_STR("hello_world", ((TokenSymbol*)token)->string);
-  ASSERT_EQ(1, ((TokenSymbol*)token)->is_quoted);
+  ASSERT_STR("hello_world", ((TokenSymbol *)token)->string);
+  ASSERT_EQ(1, ((TokenSymbol *)token)->is_quoted);
 
-  token = flux_script_token_next(&token_cursor);
+  token = flux_vector_cursor_next(&token_cursor);
   ASSERT_KIND(token, TokenKindSymbol);
-  ASSERT_STR("h3ll0w0rld", ((TokenSymbol*)token)->string);
-  ASSERT_EQ(0, ((TokenSymbol*)token)->is_quoted);
+  ASSERT_STR("h3ll0w0rld", ((TokenSymbol *)token)->string);
+  ASSERT_EQ(0, ((TokenSymbol *)token)->is_quoted);
 
-  token = flux_script_token_next(&token_cursor);
-  ASSERT_KIND(token, TokenKindNone);
+  ASSERT_INT(0, flux_vector_cursor_has_next(&token_cursor));
 
   PASS();
 }
 
 void test_lang_tokenize_keywords() {
-  TokenCursor token_cursor;
+  VectorCursor token_cursor;
   TokenHeader *token = tokenize(":hello-world :hello_world :h3ll0w0rld", &token_cursor);
 
   ASSERT_KIND(token, TokenKindKeyword);
-  ASSERT_STR("hello-world", ((TokenKeyword*)token)->string);
+  ASSERT_STR("hello-world", ((TokenKeyword *)token)->string);
 
-  token = flux_script_token_next(&token_cursor);
+  token = flux_vector_cursor_next(&token_cursor);
   ASSERT_KIND(token, TokenKindKeyword);
-  ASSERT_STR("hello_world", ((TokenKeyword*)token)->string);
+  ASSERT_STR("hello_world", ((TokenKeyword *)token)->string);
 
-  token = flux_script_token_next(&token_cursor);
+  token = flux_vector_cursor_next(&token_cursor);
   ASSERT_KIND(token, TokenKindKeyword);
-  ASSERT_STR("h3ll0w0rld", ((TokenKeyword*)token)->string);
+  ASSERT_STR("h3ll0w0rld", ((TokenKeyword *)token)->string);
 
-  token = flux_script_token_next(&token_cursor);
-  ASSERT_KIND(token, TokenKindNone);
+  ASSERT_INT(0, flux_vector_cursor_has_next(&token_cursor));
 
   PASS();
 }
 
 void test_lang_tokenize_numbers() {
-  TokenCursor token_cursor;
+  VectorCursor token_cursor;
   TokenHeader *token = tokenize("1 -20 300", &token_cursor);
 
   ASSERT_KIND(token, TokenKindInteger);
   ASSERT_INT_TOKEN(token, 1);
 
-  token = flux_script_token_next(&token_cursor);
+  token = flux_vector_cursor_next(&token_cursor);
   ASSERT_KIND(token, TokenKindInteger);
   ASSERT_INT_TOKEN(token, -20);
 
-  token = flux_script_token_next(&token_cursor);
+  token = flux_vector_cursor_next(&token_cursor);
   ASSERT_KIND(token, TokenKindInteger);
   ASSERT_INT_TOKEN(token, 300);
+
+  ASSERT_INT(0, flux_vector_cursor_has_next(&token_cursor));
 
   PASS();
 }
 
 void test_lang_tokenize_expressions() {
-  TokenCursor token_cursor;
-  TokenHeader *token = tokenize("(circle :name 'circle1 :x 200 :y -15)", &token_cursor);
+  VectorCursor token_cursor;
+  TokenHeader *token =
+      tokenize("(circle :name 'circle1 :x 200 :y -15)", &token_cursor);
 
   ASSERT_KIND(token, TokenKindParen);
-  ASSERT_EQ(1, ((TokenParen*)token)->is_open);
+  ASSERT_EQ(1, ((TokenParen *)token)->is_open);
 
-  token = flux_script_token_next(&token_cursor);
+  token = flux_vector_cursor_next(&token_cursor);
   ASSERT_KIND(token, TokenKindSymbol);
-  ASSERT_STR("circle", ((TokenSymbol*)token)->string);
+  ASSERT_STR("circle", ((TokenSymbol *)token)->string);
 
-  token = flux_script_token_next(&token_cursor);
+  token = flux_vector_cursor_next(&token_cursor);
   ASSERT_KIND(token, TokenKindKeyword);
-  ASSERT_STR("name", ((TokenKeyword*)token)->string);
+  ASSERT_STR("name", ((TokenKeyword *)token)->string);
 
-  token = flux_script_token_next(&token_cursor);
+  token = flux_vector_cursor_next(&token_cursor);
   ASSERT_KIND(token, TokenKindSymbol);
-  ASSERT_STR("circle1", ((TokenSymbol*)token)->string);
-  ASSERT_EQ(1, ((TokenSymbol*)token)->is_quoted);
+  ASSERT_STR("circle1", ((TokenSymbol *)token)->string);
+  ASSERT_EQ(1, ((TokenSymbol *)token)->is_quoted);
 
-  token = flux_script_token_next(&token_cursor);
+  token = flux_vector_cursor_next(&token_cursor);
   ASSERT_KIND(token, TokenKindKeyword);
-  ASSERT_STR("x", ((TokenKeyword*)token)->string);
+  ASSERT_STR("x", ((TokenKeyword *)token)->string);
 
-  token = flux_script_token_next(&token_cursor);
+  token = flux_vector_cursor_next(&token_cursor);
   ASSERT_KIND(token, TokenKindInteger);
   ASSERT_INT_TOKEN(token, 200);
 
-  token = flux_script_token_next(&token_cursor);
+  token = flux_vector_cursor_next(&token_cursor);
   ASSERT_KIND(token, TokenKindKeyword);
-  ASSERT_STR("y", ((TokenKeyword*)token)->string);
+  ASSERT_STR("y", ((TokenKeyword *)token)->string);
 
-  token = flux_script_token_next(&token_cursor);
+  token = flux_vector_cursor_next(&token_cursor);
   ASSERT_KIND(token, TokenKindInteger);
   ASSERT_INT_TOKEN(token, -15);
 
-  token = flux_script_token_next(&token_cursor);
+  token = flux_vector_cursor_next(&token_cursor);
   ASSERT_KIND(token, TokenKindParen);
-  ASSERT_EQ(0, ((TokenParen*)token)->is_open);
+  ASSERT_EQ(0, ((TokenParen *)token)->is_open);
 
-  token = flux_script_token_next(&token_cursor);
-  ASSERT_KIND(token, TokenKindNone);
+  ASSERT_INT(0, flux_vector_cursor_has_next(&token_cursor));
 
   PASS();
 }
 
 void test_lang_tokenize_single_symbol_list() {
-  TokenCursor token_cursor;
+  VectorCursor token_cursor;
   TokenHeader *token = tokenize("(circle)", &token_cursor);
 
   ASSERT_KIND(token, TokenKindParen);
-  ASSERT_EQ(1, ((TokenParen*)token)->is_open);
+  ASSERT_EQ(1, ((TokenParen *)token)->is_open);
 
-  token = flux_script_token_next(&token_cursor);
+  token = flux_vector_cursor_next(&token_cursor);
   ASSERT_KIND(token, TokenKindSymbol);
-  ASSERT_STR("circle", ((TokenSymbol*)token)->string);
+  ASSERT_STR("circle", ((TokenSymbol *)token)->string);
 
-  token = flux_script_token_next(&token_cursor);
+  token = flux_vector_cursor_next(&token_cursor);
   ASSERT_KIND(token, TokenKindParen);
-  ASSERT_EQ(0, ((TokenParen*)token)->is_open);
+  ASSERT_EQ(0, ((TokenParen *)token)->is_open);
 
-  token = flux_script_token_next(&token_cursor);
-  ASSERT_KIND(token, TokenKindNone);
+  ASSERT_INT(0, flux_vector_cursor_has_next(&token_cursor));
 
   PASS();
 }

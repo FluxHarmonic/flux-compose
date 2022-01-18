@@ -9,7 +9,6 @@ extern unsigned int tests_failed;
 extern char fail_message[2048];
 
 #define SUITE()                                                                \
-  tests_passed++;                                                              \
   printf("\n\n\e[1;33m • SUITE\e[0m %s\n", __func__);
 
 #define PASS()                                                                 \
@@ -24,6 +23,12 @@ extern char fail_message[2048];
   printf("      %s\n\n", fail_message);                                        \
   return;
 
+#define ASSERT_INT(expected, actual)                                            \
+  if (actual != expected) {                                                     \
+    FAIL("Expected integer: %d\n                   got: %d\n               at line: %d\n", expected, actual, __LINE__); \
+  }
+
+void test_vector_suite();
 void test_lang_suite();
 
 #endif

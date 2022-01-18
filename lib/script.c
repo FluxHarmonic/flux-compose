@@ -4,9 +4,10 @@
 #include "flux.h"
 #include "flux-internal.h"
 
-void *script_token_buffer = NULL;
 void *script_parse_buffer = NULL;
 void *script_value_buffer = NULL;
+
+Vector token_vector = NULL;
 
 #define TOKEN_BUFFER_INITIAL_SIZE 1024
 #define PARSE_BUFFER_INITIAL_SIZE 1024
@@ -38,6 +39,11 @@ typedef enum {
   TSTATE_NUMBER,
 } TokenState;
 
+#define token_reset_state(token_state, str_ptr, str_buffer)  \
+  str_ptr = &str_buffer[0];                                  \
+  *str_ptr = '\0';                                           \
+  token_state = TSTATE_NONE;
+
 #define FLAG_MINUS  1 << 31
 #define FLAG_QUOTED 1 << 31
 
@@ -51,58 +57,45 @@ int is_state(int state, int expected) {
   return expected == (state & flag_mask);
 }
 
-// Return a pointer to the next token
-TokenHeader *flux_script_token_next(TokenCursor *token_cursor) {
-  TokenHeader *token = token_cursor->current;
+void token_add_char(char **str_ptr, char c) {
+  // TODO: Check buffer bounds
+  **str_ptr = c;
+  (*str_ptr)++;
+  **str_ptr = '\0';
+}
 
-  TOKEN_LOG(token_cursor->current, "Next token requested, current kind: %d\n", token_cursor->current->kind);
+size_t flux_script_token_size(void *item) {
+  TokenHeader* token = item;
 
   switch (token->kind) {
-  case TokenKindNone:
-    // We're already at the end of the token array
-    // TODO: Signal this somehow?
-    TOKEN_LOG(token, "Can't move forward, already at the last token!\n");
-    break;
   case TokenKindParen:
-    token += 1;
-    break;
+    return sizeof(TokenParen);
   case TokenKindInteger:
-    token += 1;
-    break;
+    return sizeof(TokenInteger);
   case TokenKindFloat:
-    token += 1;
-    break;
+    return sizeof(TokenFloat);
   case TokenKindString:
-    token = (TokenHeader *)((uintptr_t)token + sizeof(TokenString) + ((TokenString*)token)->length + 1);
-    break;
+    return sizeof(TokenString) + ((TokenString *)token)->length + 1;
   case TokenKindSymbol:
-    token = (TokenHeader *)((uintptr_t)token + sizeof(TokenSymbol) + ((TokenSymbol*)token)->length + 1);
-    break;
+    return sizeof(TokenSymbol) + ((TokenSymbol *)token)->length + 1;
   case TokenKindKeyword:
-    token = (TokenHeader *)((uintptr_t)token + sizeof(TokenKeyword) + ((TokenKeyword*)token)->length + 1);
-    break;
+    return sizeof(TokenKeyword) + ((TokenKeyword *)token)->length + 1;
   default:
     PANIC("Unhandled token type: %d\n", token->kind);
   }
-
-  // Update the cursor with the current location
-  token_cursor->current = token;
-
-  TOKEN_LOG(token_cursor->current, "Next token is %d\n", token_cursor->current->kind);
-
-  return token;
 }
 
 // Tokenize the script source for the provided file stream
-TokenHeader *flux_script_tokenize(FILE *script_file) {
-  if (script_token_buffer == NULL) {
-    script_token_buffer = flux_memory_alloc(TOKEN_BUFFER_INITIAL_SIZE);
-    TOKEN_LOG(script_token_buffer, "Allocated %d bytes for token buffer\n", TOKEN_BUFFER_INITIAL_SIZE);
+Vector flux_script_tokenize(FILE *script_file) {
+  if (token_vector == NULL) {
+    token_vector = flux_vector_create(TOKEN_BUFFER_INITIAL_SIZE, flux_script_token_size);
+    TOKEN_LOG(token_vector, "Allocated %d bytes for token buffer\n", TOKEN_BUFFER_INITIAL_SIZE);
+  } else {
+    flux_vector_reset(token_vector);
   }
 
-  TokenHeader *current_token = script_token_buffer;
-  TokenCursor token_cursor;
-  token_cursor.current = current_token;
+  VectorCursor token_cursor;
+  flux_vector_cursor_init(token_vector, &token_cursor);
 
   short c = 0;
   int token_state = TSTATE_NONE;
@@ -110,7 +103,7 @@ TokenHeader *flux_script_tokenize(FILE *script_file) {
   char str_buffer[2048]; // TODO: This may need to be adjustable
   char *str_ptr = &str_buffer[0];
 
-  TOKEN_LOG(current_token, "--- TOKENIZATION START ---\n");
+  TOKEN_LOG(token_vector->start_item, "--- TOKENIZATION START ---\n");
 
   while (!feof(script_file)) {
     c = fgetc(script_file);
@@ -122,123 +115,94 @@ TokenHeader *flux_script_tokenize(FILE *script_file) {
       if (c == '"') {
         // TODO: Is the previous char a backslash?
         // Save the string token
-        TokenString *str_token = (TokenString*)current_token;
-        str_token->header.kind = TokenKindString;
-        str_token->length = str_ptr - &str_buffer[0];
-        strcpy(str_token->string, &str_buffer[0]);
-        TOKEN_LOG(str_token, "String - %s (length: %d)\n", str_token->string, str_token->length);
+        TokenString str_token;
+        str_token.header.kind = TokenKindString;
+        str_token.length = str_ptr - &str_buffer[0];
+        strcpy(str_token.string, &str_buffer[0]);
 
-        // Reset the string buffer
-        str_ptr = &str_buffer[0];
-        *str_ptr = '\0';
-
-        current_token = flux_script_token_next(&token_cursor);
-        current_token->kind = TokenKindNone;
-        token_state = TSTATE_NONE;
+        TokenHeader *token = flux_vector_push(&token_cursor, &str_token);
+        TOKEN_LOG(token, "String - %s (length: %d)\n", str_token.string, str_token.length);
+        token_reset_state(token_state, str_ptr, str_buffer);
       } else {
-        // TODO: Check buffer bounds
-        *str_ptr = c;
-        str_ptr++;
-        *str_ptr = '\0';
+        token_add_char(&str_ptr, c);
       }
     } else if (is_state(token_state, TSTATE_SYMBOL)) {
       if (c == '-' || c == '_' || isalnum(c)) {
-        *str_ptr = c;
-        str_ptr++;
-        *str_ptr = '\0';
+        token_add_char(&str_ptr, c);
       } else {
         // End the symbol
-        TokenSymbol *symbol_token = (TokenSymbol*)current_token;
-        symbol_token->header.kind = TokenKindSymbol;
-        symbol_token->length = str_ptr - &str_buffer[0];
-        symbol_token->is_quoted = flux_flag_check(token_state, FLAG_QUOTED);
-        strcpy(symbol_token->string, &str_buffer[0]);
-        TOKEN_LOG(symbol_token, "Symbol - %s (length: %d)\n", symbol_token->string, symbol_token->length);
-
-        // Reset the string buffer
-        str_ptr = &str_buffer[0];
-        *str_ptr = '\0';
+        TokenSymbol symbol_token;
+        symbol_token.header.kind = TokenKindSymbol;
+        symbol_token.length = str_ptr - &str_buffer[0];
+        symbol_token.is_quoted = flux_flag_check(token_state, FLAG_QUOTED);
+        strcpy(symbol_token.string, &str_buffer[0]);
 
         // Put the character back on the stream to read it again
         ungetc(c, script_file);
 
-        current_token = flux_script_token_next(&token_cursor);
-        current_token->kind = TokenKindNone;
-        token_state = TSTATE_NONE;
+        TokenHeader *token = flux_vector_push(&token_cursor, &symbol_token);
+        TOKEN_LOG(token, "Symbol - %s (length: %d)\n", symbol_token.string, symbol_token.length);
+        token_reset_state(token_state, str_ptr, str_buffer);
       }
     } else if (is_state(token_state, TSTATE_KEYWORD)) {
       if (c == '-' || c == '_' || isalnum(c)) {
-        *str_ptr = c;
-        str_ptr++;
-        *str_ptr = '\0';
+        token_add_char(&str_ptr, c);
       } else {
         // End the keyword
-        TokenKeyword *keyword_token = (TokenKeyword*)current_token;
-        keyword_token->header.kind = TokenKindKeyword;
-        keyword_token->length = str_ptr - &str_buffer[0];
-        strcpy(keyword_token->string, &str_buffer[0]);
-        TOKEN_LOG(keyword_token, "Keyword - :%s (length: %d)\n", keyword_token->string, keyword_token->length);
-
-        // Reset the string buffer
-        str_ptr = &str_buffer[0];
-        *str_ptr = '\0';
+        TokenKeyword keyword_token;
+        keyword_token.header.kind = TokenKindKeyword;
+        keyword_token.length = str_ptr - &str_buffer[0];
+        strcpy(keyword_token.string, &str_buffer[0]);
 
         // Put the character back on the stream to read it again
         ungetc(c, script_file);
 
-        current_token = flux_script_token_next(&token_cursor);
-        current_token->kind = TokenKindNone;
-        token_state = TSTATE_NONE;
+        TokenHeader *token = flux_vector_push(&token_cursor, &keyword_token);
+        TOKEN_LOG(token, "Keyword - :%s (length: %d)\n", keyword_token.string, keyword_token.length);
+        token_reset_state(token_state, str_ptr, str_buffer);
       }
     } else if (is_state(token_state, TSTATE_NUMBER)) {
       if (isdigit(c)) {
-        *str_ptr = c;
-        str_ptr++;
-        *str_ptr = '\0';
+        token_add_char(&str_ptr, c);
       } else {
         // End the keyword
-        TokenInteger *integer_token = (TokenInteger*)current_token;
-        integer_token->header.kind = TokenKindInteger;
-        integer_token->number = atoi(str_buffer);
-        TOKEN_LOG(integer_token, "Integer - %d\n", integer_token->number);
-
-        // Should the number be negative?
+        TokenInteger integer_token;
+        integer_token.header.kind = TokenKindInteger;
+        integer_token.number = atoi(str_buffer);
         if (flux_flag_check(token_state, FLAG_MINUS)) {
-          integer_token->number = -1 * integer_token->number;
+          integer_token.number = -1 * integer_token.number;
         }
-
-        // Reset the string buffer
-        str_ptr = &str_buffer[0];
-        *str_ptr = '\0';
 
         // Put the character back on the stream to read it again
         ungetc(c, script_file);
 
-        current_token = flux_script_token_next(&token_cursor);
-        current_token->kind = TokenKindNone;
-        token_state = TSTATE_NONE;
+        TokenHeader *token = flux_vector_push(&token_cursor, &integer_token);
+        TOKEN_LOG(token, "Integer - %d\n", integer_token.number);
+        token_reset_state(token_state, str_ptr, str_buffer);
       }
     } else {
       if (c == '(') {
-        TokenParen *paren = (TokenParen*)current_token;
-        paren->header.kind = TokenKindParen;
-        paren->is_open = 1;
-        TOKEN_LOG(paren, "Open Paren\n");
-        current_token = flux_script_token_next(&token_cursor);
+        TokenParen paren;
+        paren.header.kind = TokenKindParen;
+        paren.is_open = 1;
+
+        TokenHeader *token = flux_vector_push(&token_cursor, &paren);
+        TOKEN_LOG(token, "Open Paren\n");
+        token_reset_state(token_state, str_ptr, str_buffer);
       } else if (c == ')') {
         // Are we in a string?
         if (token_state == TSTATE_STRING) {
           continue;
         }
 
-        TokenParen *paren = (TokenParen*)current_token;
-        paren->header.kind = TokenKindParen;
-        paren->is_open = 0;
-        TOKEN_LOG(paren, "Close Paren\n");
+        TokenParen paren;
+        paren.header.kind = TokenKindParen;
+        paren.is_open = 0;
 
-        current_token = flux_script_token_next(&token_cursor);
-        current_token->kind = TokenKindNone;
-        token_state = TSTATE_NONE;
+        TokenHeader *token = flux_vector_push(&token_cursor, &paren);
+        TOKEN_LOG(token, "Close Paren\n");
+
+        token_reset_state(token_state, str_ptr, str_buffer);
       } else if (c == '"') {
         token_state = TSTATE_STRING;
       } else if (c == ':') {
@@ -246,25 +210,20 @@ TokenHeader *flux_script_tokenize(FILE *script_file) {
       } else if (c == '\'') {
         token_state = TSTATE_SYMBOL | FLAG_QUOTED;
       } else if (isalpha(c)) {
-        *str_ptr = c;
-        str_ptr++;
-        *str_ptr = '\0';
+        token_add_char(&str_ptr, c);
         token_state = TSTATE_SYMBOL;
       } else if (c == '-') {
         token_state = TSTATE_NUMBER | FLAG_MINUS;
       } else if (isdigit(c)) {
-        *str_ptr = c;
-        str_ptr++;
-        *str_ptr = '\0';
+        token_add_char(&str_ptr, c);
         token_state = TSTATE_NUMBER;
       }
     }
   }
 
-  TOKEN_LOG(current_token, "Finished tokenization!\n");
+  TOKEN_LOG(token_vector->start_item, "Finished tokenization!\n");
 
-  // Return the location of the token buffer since it holds the first token
-  return script_token_buffer;
+  return token_vector;
 }
 
 typedef enum {
@@ -374,11 +333,11 @@ ExprHeader *flux_script_expr_list_init(ExprList *list, ExprListCursor *list_curs
   flux_script_expr_list_cursor_init(list, list_cursor);
 }
 
-ExprList *flux_script_parse_list(TokenCursor *token_cursor, ExprListCursor *list_cursor) {
+ExprList *flux_script_parse_list(VectorCursor *token_cursor, ExprListCursor *list_cursor) {
   PARSE_LOG(list_cursor->list, "Parse list starting at %x...\n", &list_cursor->list->items);
 
-  TokenHeader *token = token_cursor->current;
-  while (token->kind != TokenKindNone) {
+  while (flux_vector_cursor_has_next(token_cursor)) {
+    TokenHeader *token = flux_vector_cursor_next(token_cursor);
     PARSE_LOG(list_cursor->list, "Parser got token %d (%x)\n", token->kind, token);
 
     // Parse sub-lists
@@ -391,18 +350,9 @@ ExprList *flux_script_parse_list(TokenCursor *token_cursor, ExprListCursor *list
         ExprListCursor sub_list_cursor;
         flux_script_expr_list_init(sub_list, &sub_list_cursor);
 
-        // Move to the next token before recursing
-        token = flux_script_token_next(token_cursor);
-
-        // TODO: Make this a legitimate parse error
-        if (token->kind == TokenKindNone) {
-          PANIC("List ended prematurely!");
-        }
-
-        PARSE_LOG(list_cursor->list, "Begin sub-list parse starting at %x...\n", list_cursor->current);
-
         // Parse the list contents recursively.  The sub-cursor will tell us
         // where to resume the parent list's data once this function completes.
+        PARSE_LOG(list_cursor->list, "Begin sub-list parse starting at %x...\n", list_cursor->current);
         flux_script_parse_list(token_cursor, &sub_list_cursor);
 
         // Trace where we're headed next
@@ -462,9 +412,6 @@ ExprList *flux_script_parse_list(TokenCursor *token_cursor, ExprListCursor *list
       // If we see any unusual token kind, bail out
       PANIC("Parser received unexpected TokenKind %d\n", token->kind);
     }
-
-    // Get the next token to process
-    token = flux_script_token_next(token_cursor);
   }
 
   // At this point, assume we've reached TokenKindNone so set the
@@ -472,7 +419,7 @@ ExprList *flux_script_parse_list(TokenCursor *token_cursor, ExprListCursor *list
   PARSE_LOG(list_cursor->current, "EXIT list parse, set ExprKindNone\n");
 }
 
-ExprList *flux_script_parse(TokenHeader *start_token) {
+ExprList *flux_script_parse(Vector token_vector) {
   // This function will be called recursively for all lists so that
   // we can maintain the ExprListIterator on the stack
   //
@@ -491,8 +438,8 @@ ExprList *flux_script_parse(TokenHeader *start_token) {
   }
 
   // Set the token cursor
-  TokenCursor token_cursor;
-  token_cursor.current = start_token;
+  VectorCursor token_cursor;
+  flux_vector_cursor_init(token_vector, &token_cursor);
 
   // Create the top-level expression list
   ExprList *top_level_list = (ExprList*)script_parse_buffer;
@@ -636,10 +583,10 @@ ValueHeader *flux_script_eval_expr(ExprHeader *expr, ValueCursor *value_cursor) 
 }
 
 ValueHeader *flux_script_eval(FILE *script_file) {
-  TokenHeader *first_token = flux_script_tokenize(script_file);
-  if (first_token != NULL) {
+  Vector token_vector = flux_script_tokenize(script_file);
+  if (token_vector != NULL && token_vector->length > 0) {
     ValueCursor value_cursor;
-    ExprList *result = flux_script_parse(first_token);
+    ExprList *result = flux_script_parse(token_vector);
     return flux_script_eval_expr((ExprHeader *)result, &value_cursor);
   }
 

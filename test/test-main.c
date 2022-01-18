@@ -9,6 +9,7 @@ char fail_message[2048];
 int main() {
   printf("\n\e[1;36mFlux Compose Test Runner\e[0m\n");
 
+  test_vector_suite();
   test_lang_suite();
 
   // Print the test report
