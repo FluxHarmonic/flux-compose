@@ -79,7 +79,8 @@ typedef enum {
   ExprKindList,
   ExprKindSymbol,
   ExprKindKeyword,
-  ExprKindValue
+  ExprKindInteger,
+  ExprKindString
 } ExprKind;
 
 typedef struct {
@@ -101,11 +102,14 @@ typedef struct {
 
 typedef struct {
   ExprHeader header;
+  int number;
+} ExprInteger;
 
-  // Do not trust the size of this field! Use the function
-  // flux_script_value_size to get the full size of ExprValue.
-  ValueHeader value;
-} ExprValue;
+typedef struct {
+  ExprHeader header;
+  unsigned int length;
+  char string[];
+} ExprString;
 
 typedef struct {
   ExprHeader header;
@@ -113,8 +117,7 @@ typedef struct {
 } ExprList;
 
 extern Vector flux_script_tokenize(FILE *script_file);
-extern TokenHeader *flux_script_token_next(TokenCursor *token_cursor);
-extern ExprList *flux_script_parse(Vector token_vector);
+extern Vector flux_script_parse(Vector token_vector);
 extern ValueHeader *flux_script_eval_expr(ExprHeader *expr);
 
 // Graphics -------------------------------------------

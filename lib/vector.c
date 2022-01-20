@@ -91,6 +91,6 @@ void* flux_vector_push(VectorCursor *cursor, void* item) {
 // Resets the internal vector state to appear empty
 void flux_vector_reset(Vector vector) {
   vector->length = 0;
-  vector->buffer_usage = sizeof(Vector);
+  vector->buffer_usage = 0;
   *(int *)vector->start_item = 0; // Set the 'kind' of the first item to 0
 }

@@ -26,7 +26,7 @@
 
 #define ASSERT_EQ(expected, actual)                                       \
   if (actual != expected) {                                           \
-    FAIL("Expected value %d, got %s", expected, actual);              \
+    FAIL("Expected value %d, got %d", expected, actual);              \
   }
 
 /* #define ASSERT_FLOAT(_token, expected)                                           \ */
@@ -45,28 +45,27 @@ TokenHeader *tokenize(char *input, VectorCursor *cursor) {
   return flux_vector_cursor_next(cursor);
 }
 
-ExprList *parse(char *input, ExprListCursor *list_cursor) {
+Vector parse(char *input, VectorCursor *list_cursor) {
   FILE *stream = flux_file_from_string(input);
   Vector token_vector = flux_script_tokenize(stream);
   fclose(stream);
 
   // Set up the cursor
-  list_cursor->list = flux_script_parse(token_vector);
-  list_cursor->current = NULL;
-  list_cursor->index = 0;
+  Vector expr_vector = flux_script_parse(token_vector);
+  flux_vector_cursor_init(expr_vector, list_cursor);
 
-  return list_cursor->list;
+  return expr_vector;
 }
 
 ValueHeader *eval(char *input) {
   FILE *stream = flux_file_from_string(input);
-  TokenHeader *token = flux_script_tokenize(stream);
+  Vector token_vector = flux_script_tokenize(stream);
   fclose(stream);
 
   // Eval the resulting expression and return it
   ValueCursor value_cursor;
-  ExprList *result = flux_script_parse(token);
-  return flux_script_eval_expr((ExprHeader *)&result->items[0]);
+  Vector result = flux_script_parse(token_vector);
+  return flux_script_eval_expr((ExprHeader *)&result->start_item);
 }
 
 void test_lang_tokenize_empty() {
@@ -235,62 +234,61 @@ void test_lang_tokenize_single_symbol_list() {
 
 void test_lang_parse_list() {
   ExprHeader *expr = NULL;
-  ExprListCursor list_cursor;
+  VectorCursor list_cursor;
   parse("(circle :name \"circle1\" :x 200 :y -15)", &list_cursor);
 
   // Every result is wrapped in a top-level list
-  expr = flux_script_expr_list_next(&list_cursor);
+  expr = flux_vector_cursor_next(&list_cursor);
   ASSERT_EQ(ExprKindList, expr->kind);
 
   // Prepare a cursor for the sub list
-  ExprListCursor sub_list_cursor;
-  flux_script_expr_list_cursor_init(expr, &sub_list_cursor);
+  VectorCursor sub_list_cursor;
+  flux_vector_cursor_init(&((ExprList*)expr)->items, &sub_list_cursor);
 
   // circle
-  expr = flux_script_expr_list_next(&sub_list_cursor);
+  expr = flux_vector_cursor_next(&sub_list_cursor);
   ASSERT_EQ(ExprKindSymbol, expr->kind);
   ASSERT_STR("circle", ((ExprSymbol *)expr)->name);
 
   // :name
-  expr = flux_script_expr_list_next(&sub_list_cursor);
+  expr = flux_vector_cursor_next(&sub_list_cursor);
   ASSERT_EQ(ExprKindKeyword, expr->kind);
   ASSERT_STR("name", ((ExprKeyword *)expr)->name);
 
   // "circle1"
-  expr = flux_script_expr_list_next(&sub_list_cursor);
-  ASSERT_EQ(ExprKindValue, ((ExprValue *)expr)->header.kind);
-  ASSERT_EQ(ValueKindString, ((ExprValue *)expr)->value.kind);
-  ASSERT_STR("circle1", ((ValueString*)&((ExprValue *)expr)->value)->string);
+  expr = flux_vector_cursor_next(&sub_list_cursor);
+  ASSERT_EQ(ExprKindString, ((ExprString *)expr)->header.kind);
+  ASSERT_STR("circle1", ((ExprString *)expr)->string);
 
   // :x
-  expr = flux_script_expr_list_next(&sub_list_cursor);
+  expr = flux_vector_cursor_next(&sub_list_cursor);
   ASSERT_EQ(ExprKindKeyword, expr->kind);
   ASSERT_STR("x", ((ExprKeyword *)expr)->name);
 
   // 200
-  expr = flux_script_expr_list_next(&sub_list_cursor);
-  ASSERT_EQ(ExprKindValue, ((ExprValue *)expr)->header.kind);
-  ASSERT_EQ(ValueKindInteger, ((ExprValue *)expr)->value.kind);
-  ASSERT_INT_VALUE(((ExprValue *)expr)->value, 200);
+  expr = flux_vector_cursor_next(&sub_list_cursor);
+  ASSERT_EQ(ExprKindInteger, ((ExprInteger *)expr)->header.kind);
+  ASSERT_EQ(200, ((ExprInteger *)expr)->number);
 
   // :y
-  expr = flux_script_expr_list_next(&sub_list_cursor);
+  expr = flux_vector_cursor_next(&sub_list_cursor);
   ASSERT_EQ(ExprKindKeyword, expr->kind);
   ASSERT_STR("y", ((ExprKeyword *)expr)->name);
 
   // -15
-  expr = flux_script_expr_list_next(&sub_list_cursor);
-  ASSERT_EQ(ExprKindValue, expr->kind);
-  ASSERT_EQ(ValueKindInteger, ((ExprValue *)expr)->value.kind);
-  ASSERT_INT_VALUE(((ExprValue *)expr)->value, -15);
+  expr = flux_vector_cursor_next(&sub_list_cursor);
+  ASSERT_EQ(ExprKindInteger, expr->kind);
+  ASSERT_EQ(-15, ((ExprInteger*)expr)->number);
 
-  expr = flux_script_expr_list_next(&sub_list_cursor);
-  ASSERT_EQ(ExprKindNone, expr->kind);
+  ASSERT_EQ(0, flux_vector_cursor_has_next(&sub_list_cursor));
+  ASSERT_EQ(0, flux_vector_cursor_has_next(&list_cursor));
+
+  PASS();
 }
 
 void test_lang_parse_multiple_exprs() {
   ExprHeader *expr = NULL;
-  ExprListCursor list_cursor;
+  VectorCursor list_cursor;
   parse("(circle 200) (do-something)", &list_cursor);
 
   /* FAIL("Not implemented yet."); */
@@ -298,7 +296,7 @@ void test_lang_parse_multiple_exprs() {
 
 void test_lang_parse_nested_lists() {
   ExprHeader *expr = NULL;
-  ExprListCursor list_cursor;
+  VectorCursor list_cursor;
   parse("(circle :color (rgb 255 0 0))", &list_cursor);
 
   /* FAIL("Not implemented yet."); */

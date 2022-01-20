@@ -244,128 +244,115 @@ size_t flux_script_expr_size(void *item) {
 
   switch (expr->kind) {
   case ExprKindList:
-    PARSE_LOG(expr, "Item is List\n");
-
-    // Loop over the sub-list to get the position after the list is complete
-    /* flux_script_expr_list_cursor_init((ExprList *)expr, &sub_list_cursor); */
-    /* PARSE_LOG(expr, "Sub list length %d\n", sub_list_cursor.list->length); */
-    /* do { */
-    /*   sub_expr = flux_script_expr_list_next(&sub_list_cursor); */
-    /*   PARSE_LOG(expr, "Sub expr %d\n", sub_list_cursor.index); */
-    /* } while (sub_list_cursor.index <= sub_list_cursor.list->length); */
-
-    /* list_cursor->current = sub_list_cursor.current; */
-    /* PARSE_LOG(list_cursor->list, "NEXT of List: %x\n", list_cursor->current); */
-
-    // TODO: This is broken!
-    return 0;
-    break;
-
+    PARSE_LOG(expr, "Item is List (presumed size: %lu + %lu)\n", sizeof(ExprList), ((ExprList *)expr)->items.buffer_usage);
+    return sizeof(ExprList) + ((ExprList *)expr)->items.buffer_usage;
   case ExprKindSymbol:
     PARSE_LOG(expr, "Item is Symbol\n");
     return sizeof(ExprSymbol) + ((ExprSymbol *)expr)->length + 1;
   case ExprKindKeyword:
     PARSE_LOG(expr, "Item is Keyword\n");
     return sizeof(ExprKeyword) + ((ExprKeyword *)expr)->length + 1;
-  case ExprKindValue:
-    PARSE_LOG(expr, "Item is Value\n");
-    return sizeof(ExprHeader) + flux_script_value_size(&(((ExprValue *)expr)->value));
+  case ExprKindString:
+    PARSE_LOG(expr, "Item is String\n");
+    return sizeof(ExprString) + ((ExprString *)expr)->length + 1;
+  case ExprKindInteger:
+    PARSE_LOG(expr, "Item is Integer\n");
+    return sizeof(ExprInteger);
   default:
     PANIC("Unhandled expr type: %d\n", expr->kind);
   }
 }
 
 ExprList *flux_script_parse_list(VectorCursor *token_cursor, VectorCursor *list_cursor) {
-  PARSE_LOG(list_cursor->list, "Parse list starting at %x...\n", &list_cursor->list->items);
+  PARSE_LOG(list_cursor->vector, "Parse list starting at %x...\n", &list_cursor->vector->start_item);
 
   while (flux_vector_cursor_has_next(token_cursor)) {
     TokenHeader *token = flux_vector_cursor_next(token_cursor);
-    PARSE_LOG(list_cursor->list, "Parser got token %d (%x)\n", token->kind, token);
+    PARSE_LOG(list_cursor->vector, "Parser got token %d (%x)\n", token->kind, token);
 
     // Parse sub-lists
     if (token->kind == TokenKindParen) {
       if (((TokenParen*)token)->is_open) {
-        PARSE_LOG(list_cursor->list, "START sub-list --\n");
+        PARSE_LOG(list_cursor->vector, "START sub-list --\n");
 
-        // Start a new list and its cursor
-        ExprList *sub_list = (ExprList*)flux_script_expr_list_push(list_cursor);
-        ExprListCursor sub_list_cursor;
-        flux_script_expr_list_init(sub_list, &sub_list_cursor);
+        // Start a new temporary list that will be copied later
+        ExprList temp_sub_list;
+        temp_sub_list.header.kind = ExprKindList;
+        flux_vector_init(&temp_sub_list.items, flux_script_expr_size);
+
+        // Push the new list onto the parent vector and set up a cursor
+        ExprList *sub_list = flux_vector_push(list_cursor, &temp_sub_list);
+        sub_list->items.start_item = sub_list + 1;
+        PARSE_LOG(sub_list, "Created sub-vector for nested list (vector at %x)\n", &sub_list->items);
+        VectorCursor sub_list_cursor;
+        flux_vector_cursor_init(&sub_list->items, &sub_list_cursor);
+
+        PARSE_LOG(&sub_list->items, "This is the sub-list vector (func: %x)\n", sub_list->items.item_size_func);
+        PARSE_LOG(&sub_list->items, "The real size func location is %x\n", flux_script_expr_size);
 
         // Parse the list contents recursively.  The sub-cursor will tell us
         // where to resume the parent list's data once this function completes.
-        PARSE_LOG(list_cursor->list, "Begin sub-list parse starting at %x...\n", list_cursor->current);
+        PARSE_LOG(list_cursor->vector, "Begin sub-list parse starting at %x...\n", list_cursor->current_item);
         flux_script_parse_list(token_cursor, &sub_list_cursor);
 
         // Trace where we're headed next
-        PARSE_LOG(list_cursor->current, "Outer list will resume at %x\n", sub_list_cursor.current);
+        PARSE_LOG(list_cursor->current_item, "Outer list will resume at %x\n", sub_list_cursor.current_item);
 
         // Set the outer cursor to be where the inner cursor left off
-        list_cursor->current = sub_list_cursor.current;
+        list_cursor->current_item = sub_list_cursor.current_item;
       } else {
-        PARSE_LOG(list_cursor->current, "END list, length %d...\n", list_cursor->list->length);
-        return list_cursor->list;
+        PARSE_LOG(list_cursor->current_item, "END list, length %d...\n", list_cursor->vector->length);
+        return (ExprList*)((uintptr_t)list_cursor->vector - sizeof(ExprHeader));
       }
     } else if (token->kind == TokenKindSymbol) {
       ExprSymbol symbol;
-      PARSE_LOG(symbol, "Setting symbol: %s\n", ((TokenSymbol *)token)->string);
+      PARSE_LOG(list_cursor->current_item, "Setting symbol: %s\n", ((TokenSymbol *)token)->string);
       symbol.header.kind = ExprKindSymbol;
       symbol.length = ((TokenSymbol*)token)->length;
       strcpy(symbol.name, ((TokenSymbol*)token)->string);
       symbol.is_quoted = ((TokenSymbol*)token)->is_quoted;
 
-      flux_vector_push(list_cursor, &symbol);
+      ExprSymbol *final_symbol = flux_vector_push(list_cursor, &symbol);
+      PARSE_LOG(final_symbol, "Pushed symbol: %s\n", final_symbol->name);
     } else if (token->kind == TokenKindKeyword) {
       ExprKeyword keyword;
-      PARSE_LOG(keyword, "Setting keyword: %s\n", ((TokenKeyword *)token)->string);
+      PARSE_LOG(list_cursor->current_item, "Setting keyword: %s\n", ((TokenKeyword *)token)->string);
       keyword.header.kind = ExprKindKeyword;
       keyword.length = ((TokenKeyword*)token)->length;
       strcpy(keyword.name, ((TokenKeyword*)token)->string);
 
       flux_vector_push(list_cursor, &keyword);
     } else if (token->kind == TokenKindInteger) {
-      ExprValue integer;
-      PARSE_LOG(integer, "Setting integer: %d\n", ((TokenInteger *)token)->number);
-      integer.header.kind = ExprKindValue;
+      ExprInteger integer;
+      PARSE_LOG(list_cursor->current_item, "Setting integer: %d\n", ((TokenInteger *)token)->number);
+      integer.header.kind = ExprKindInteger;
+      integer.number = ((TokenInteger *)token)->number;
 
-      // Set the value
-      ValueInteger *int_value = (ValueInteger *)&(integer.value);
-      int_value->header.kind = ValueKindInteger;
-      int_value->value = ((TokenInteger *)token)->number;
-
-      // Move the cursor forward
-      flux_script_expr_list_next(list_cursor);
+      flux_vector_push(list_cursor, &integer);
     } else if (token->kind == TokenKindString) {
-      ExprValue *string = (ExprValue*)flux_script_expr_list_push(list_cursor);
-      PARSE_LOG(string, "Setting string: %d\n", ((TokenString *)token)->string);
-      string->header.kind = ExprKindValue;
+      ExprString string;
+      PARSE_LOG(list_cursor->current_item, "Setting string: %s\n", ((TokenString *)token)->string);
+      string.header.kind = ExprKindString;
+      string.length = ((TokenString*)token)->length;
+      strcpy(string.string, ((TokenString*)token)->string);
 
-      // Set the value
-      ValueString *str_value = (ValueString*)&(string->value);
-      str_value->header.kind = ValueKindString;
-      str_value->length = ((TokenString*)token)->length;
-      strcpy(str_value->string, ((TokenString*)token)->string);
-
-      // Move the cursor forward
-      flux_script_expr_list_next(list_cursor);
+      ExprString *final_string = flux_vector_push(list_cursor, &string);
+      PARSE_LOG(final_string, "Pushed string: %s\n", final_string->string);
     } else if (token->kind != TokenKindNone) {
       // If we see any unusual token kind, bail out
       PANIC("Parser received unexpected TokenKind %d\n", token->kind);
     }
   }
 
-  // At this point, assume we've reached TokenKindNone so set the
-  // current expression kind to mark the end
-  PARSE_LOG(list_cursor->current, "EXIT list parse, set ExprKindNone\n");
+  // At this point, assume we've reached TokenKindNone
+  PARSE_LOG(list_cursor->current_item, "EXIT list parse\n");
 }
 
-ExprList *flux_script_parse(Vector token_vector) {
-  VectorCursor list_cursor;
-
+Vector flux_script_parse(Vector token_vector) {
   // Allocate the parse vector if necessary
   if (parse_vector == NULL) {
     parse_vector = flux_vector_create(PARSE_BUFFER_INITIAL_SIZE, flux_script_expr_size);
-    PARSE_LOG(script_parse_buffer, "Allocated %d bytes for parse buffer\n", PARSE_BUFFER_INITIAL_SIZE);
+    PARSE_LOG(parse_vector, "Allocated %d bytes for parse buffer\n", PARSE_BUFFER_INITIAL_SIZE);
   } else {
     flux_vector_reset(parse_vector);
   }
@@ -374,20 +361,16 @@ ExprList *flux_script_parse(Vector token_vector) {
   VectorCursor token_cursor;
   flux_vector_cursor_init(token_vector, &token_cursor);
 
-  // Create the top-level expression list
-  ExprList *top_level_list = (ExprList*)script_parse_buffer;
-
-  PARSE_LOG(list_cursor.list, "--- PARSING START ---\n");
+  PARSE_LOG(parse_vector, "--- PARSING START ---\n");
 
   // Parse the top-level list, this will parse everything recursively
+  VectorCursor list_cursor;
+  flux_vector_cursor_init(parse_vector, &list_cursor);
   flux_script_parse_list(&token_cursor, &list_cursor);
 
-  // Set the final item to None to ensure iteration can finish
-  list_cursor.current->kind = ExprKindNone;
+  PARSE_LOG(list_cursor.current_item, "FINISHED parsing top-level!\n");
 
-  PARSE_LOG(list_cursor.current, "FINISHED parsing top-level!\n");
-
-  return top_level_list;
+  return parse_vector;
 }
 
 ValueHeader *flux_script_value_next(ValueCursor *value_cursor) {
@@ -442,16 +425,16 @@ ValueHeader *flux_script_value_copy(ValueHeader *value, ValueCursor *value_curso
   return new_value;
 }
 
-ValueHeader *flux_script_func_add(ExprListCursor *list_cursor, ValueCursor *value_cursor) {
+ValueHeader *flux_script_func_add(VectorCursor *list_cursor, ValueCursor *value_cursor) {
   int i;
   int sum = 0;
 
   // Iterate over the remaining expressions, evaluate them, and do some work
   // TODO: Don't limit the numbre of inputs
   for (i = 0; i < 2; i++) {
-    EVAL_LOG(list_cursor->current, "INSIDE LOOP: %d %d\n", i, list_cursor->current->kind);
-    flux_script_expr_list_next(list_cursor);
-    ValueHeader *result = flux_script_eval_expr(list_cursor->current);
+    EVAL_LOG(list_cursor->current_item, "INSIDE LOOP: %d %d\n", i, list_cursor->current->kind);
+    flux_vector_cursor_next(list_cursor);
+    ValueHeader *result = flux_script_eval_expr(list_cursor->current_item);
     // TODO: Verify that it's an integer
     sum += ((ValueInteger *)result)->value;
   }
@@ -467,6 +450,7 @@ ValueHeader *flux_script_func_add(ExprListCursor *list_cursor, ValueCursor *valu
 
 ValueHeader *flux_script_eval_expr(ExprHeader *expr) {
   ValueCursor value_cursor;
+  VectorCursor arg_cursor;
 
   // Allocate the parse buffer if necessary
   if (script_value_buffer == NULL) {
@@ -480,15 +464,24 @@ ValueHeader *flux_script_eval_expr(ExprHeader *expr) {
   EVAL_LOG(value_cursor.current, "Eval expr kind %d\n", expr->kind);
 
   switch (expr->kind) {
-  case ExprKindValue:
-    return flux_script_value_copy(&((ExprValue*)expr)->value, &value_cursor);
+  case ExprKindInteger:
+    /* ValueInteger int_value; */
+    /* int_value.header.kind = ValueKindInteger; */
+    /* int_value.value = ((ExprInteger *)expr)->number; */
+    // TODO: Fix this!
+    return NULL;
+  case ExprKindString:
+    /* ValueString str_value; */
+    /* str_value.header.kind = ValueKindString; */
+    /* str_value.length = ((ExprString*)token)->length; */
+    /* strcpy(str_value.string, ((ExprString*)token)->string); */
+    return NULL;
   case ExprKindList:
     // Initialize the cursor for the expression
-    ExprListCursor arg_cursor;
 
     // First of all, grab the symbol at the beginning of the list
-    flux_script_expr_list_cursor_init(expr, &arg_cursor);
-    ExprHeader *call_symbol = flux_script_expr_list_next(&arg_cursor);
+    flux_vector_cursor_init(&((ExprList*)expr)->items, &arg_cursor);
+    ExprHeader *call_symbol = flux_vector_cursor_next(&arg_cursor);
 
     // Look up symbol
     // Make sure it's a funciton pointer

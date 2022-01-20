@@ -18,7 +18,7 @@ typedef size_t (*VectorItemSizeFunc)(void *);
 typedef struct _Vector *Vector;
 
 typedef struct {
-  uint32_t index;
+  int32_t index;
   Vector vector;
   void *current_item;
 } VectorCursor;
