@@ -23,7 +23,7 @@ typedef struct {
 typedef struct {
   TestHeader header;
   int length;
-  char name[];
+  char name[32];
 } TestVariable;
 
 size_t test_kind_size(void *item) {

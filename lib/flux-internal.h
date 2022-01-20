@@ -44,14 +44,14 @@ typedef struct {
 typedef struct {
   TokenHeader header;
   unsigned int length;
-  char string[];
+  char string[128];
 } TokenString;
 
 typedef struct {
   TokenHeader header;
   unsigned int length;
   char is_quoted;
-  char string[];
+  char string[128];
 } TokenSymbol;
 
 typedef TokenString TokenKeyword;
@@ -91,13 +91,13 @@ typedef struct {
   ExprHeader header;
   char is_quoted;
   unsigned int length;
-  char name[];
+  char name[32];
 } ExprSymbol;
 
 typedef struct {
   ExprHeader header;
   unsigned int length;
-  char name[];
+  char name[32];
 } ExprKeyword;
 
 typedef struct {
@@ -108,7 +108,7 @@ typedef struct {
 typedef struct {
   ExprHeader header;
   unsigned int length;
-  char string[];
+  char string[128];
 } ExprString;
 
 typedef struct {
