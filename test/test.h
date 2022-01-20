@@ -4,6 +4,7 @@
 #include <stdio.h>
 
 extern unsigned int tests_passed;
+extern unsigned int tests_skipped;
 extern unsigned int tests_failed;
 
 extern char fail_message[2048];
@@ -14,6 +15,11 @@ extern char fail_message[2048];
 #define PASS()                                                                 \
   tests_passed++;                                                              \
   printf("\e[1;92m  ✓ PASS\e[0m %s\n", __func__);                              \
+  return;
+
+#define SKIP()                                                                 \
+  tests_skipped++;                                                             \
+  printf("\e[1;33m 🛇 SKIP\e[0m %s\n", __func__);                               \
   return;
 
 #define FAIL(message, ...)                                                     \
