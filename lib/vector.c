@@ -2,6 +2,23 @@
 #include "flux.h"
 #include "flux-internal.h"
 
+// Initialize a Vector struct at a pre-existing location.
+//
+// The `item_size_func` parameter is a pointer to a function that will report
+// the size for an item at a specific location in vector memory.
+//
+// The structs used for vector items must use an enum for the item kind as
+// the first field for each struct that that will be stored in the vector.
+Vector flux_vector_init(Vector vector, VectorItemSizeFunc item_size_func) {
+  vector->start_item = vector + 1;
+  // TODO: Need a way to abstract buffer management!
+  vector->buffer_size = -1;
+  vector->item_size_func = item_size_func;
+  flux_vector_reset(vector);
+
+  return vector;
+}
+
 // Create a new vector, preallocating memory of the specified size.
 //
 // The `item_size_func` parameter is a pointer to a function that will report
@@ -12,10 +29,8 @@
 Vector flux_vector_create(size_t initial_size,
                           VectorItemSizeFunc item_size_func) {
   Vector vector = flux_memory_alloc(initial_size);
-  vector->start_item = vector + 1;
+  flux_vector_init(vector, item_size_func);
   vector->buffer_size = initial_size;
-  vector->item_size_func = item_size_func;
-
   return vector;
 }
 
@@ -66,6 +81,7 @@ void* flux_vector_push(VectorCursor *cursor, void* item) {
   current = cursor->current_item;
   cursor->index++;
   cursor->vector->length++;
+  cursor->vector->buffer_usage += item_size;
   cursor->current_item = (void *)((uintptr_t)cursor->current_item + (uintptr_t)item_size);
   *(int *)cursor->current_item = 0; // Set the 'kind' of the next item to 0
 
@@ -75,5 +91,6 @@ void* flux_vector_push(VectorCursor *cursor, void* item) {
 // Resets the internal vector state to appear empty
 void flux_vector_reset(Vector vector) {
   vector->length = 0;
+  vector->buffer_usage = sizeof(Vector);
   *(int *)vector->start_item = 0; // Set the 'kind' of the first item to 0
 }

@@ -10,6 +10,7 @@ struct _Vector {
   uint32_t length;
   void *start_item;
   size_t buffer_size;
+  size_t buffer_usage;
   VectorItemSizeFunc item_size_func;
 };
 
@@ -108,26 +109,17 @@ typedef struct {
 
 typedef struct {
   ExprHeader header;
-  unsigned int length;
-  ExprHeader items[];
+  struct _Vector items;
 } ExprList;
-
-typedef struct {
-  ExprList *list;
-  unsigned int index;
-  ExprHeader *current;
-} ExprListCursor;
 
 extern Vector flux_script_tokenize(FILE *script_file);
 extern TokenHeader *flux_script_token_next(TokenCursor *token_cursor);
-extern ExprHeader *flux_script_expr_list_next(ExprListCursor *iterator);
 extern ExprList *flux_script_parse(Vector token_vector);
-extern void *flux_script_expr_list_cursor_init(ExprList *list, ExprListCursor *list_cursor);
 extern ValueHeader *flux_script_eval_expr(ExprHeader *expr);
 
 // Graphics -------------------------------------------
 
-extern ValueHeader *flux_graphics_func_show_preview_window(ExprListCursor *list_cursor, ValueCursor *value_cursor);
-extern ValueHeader *flux_graphics_func_circle(ExprListCursor *list_cursor, ValueCursor *value_cursor);
+extern ValueHeader *flux_graphics_func_show_preview_window(VectorCursor *list_cursor, ValueCursor *value_cursor);
+extern ValueHeader *flux_graphics_func_circle(VectorCursor *list_cursor, ValueCursor *value_cursor);
 
 #endif

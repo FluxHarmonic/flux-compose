@@ -35,27 +35,23 @@ Circle* make_circle_struct(Sint16 x, Sint16 y, Sint16 radius, Color* color) {
   return circle;
 }
 
-ValueHeader *flux_graphics_func_circle(ExprListCursor *list_cursor, ValueCursor *value_cursor) {
+ValueHeader *flux_graphics_func_circle(VectorCursor *list_cursor, ValueCursor *value_cursor) {
   Sint16 x = 0, y = 0, radius = 0;
   Color *color = NULL;
 
   // Read values from K/V pairs
-  // TODO: Have a better end state to check for
-  ExprHeader *expr = flux_script_expr_list_next(list_cursor);
-  while (list_cursor->current != ExprKindNone) {
+  while (flux_vector_cursor_has_next(list_cursor)) {
+    ExprHeader *expr = flux_vector_cursor_next(list_cursor);
     if (expr->kind == ExprKindKeyword) {
       // TODO: Check for none
-      ExprHeader *value = flux_script_expr_list_next(list_cursor);
+      ExprHeader *value = flux_vector_cursor_next(list_cursor);
 
-      // Which keyword name is it
-      if (strcmp(((ExprKeyword*)expr)->name, "name") == 0) {
-        flux_log("Found a name keyword! %s\n", ((ExprSymbol*)value)->name);
+      // Which keyword name is it?
+      char *key_name = ((ExprKeyword *)expr)->name;
+      if (strcmp(key_name, "name") == 0) {
+        flux_log("Found a name keyword! %s\n", ((ExprSymbol *)value)->name);
       }
-
-      // Find the value
     }
-
-    expr = flux_script_expr_list_next(list_cursor);
   }
 
   // TODO: Wrap this in a value type

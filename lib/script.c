@@ -4,10 +4,10 @@
 #include "flux.h"
 #include "flux-internal.h"
 
-void *script_parse_buffer = NULL;
 void *script_value_buffer = NULL;
 
 Vector token_vector = NULL;
+Vector parse_vector = NULL;
 
 #define TOKEN_BUFFER_INITIAL_SIZE 1024
 #define PARSE_BUFFER_INITIAL_SIZE 1024
@@ -107,8 +107,6 @@ Vector flux_script_tokenize(FILE *script_file) {
 
   while (!feof(script_file)) {
     c = fgetc(script_file);
-
-    /* printf("Char: %c\n", c); */
 
     // Are we in a string?
     if (is_state(token_state, TSTATE_STRING)) {
@@ -241,99 +239,43 @@ size_t flux_script_value_size(ValueHeader *value) {
   }
 }
 
-void *flux_script_expr_list_cursor_init(ExprList *list, ExprListCursor *list_cursor) {
-  list_cursor->index = 0;
-  list_cursor->list = list;
-  list_cursor->current = NULL;
-}
+size_t flux_script_expr_size(void *item) {
+  ExprHeader *expr = item;
 
-char flux_script_expr_list_has_next(ExprListCursor *list_cursor) {
-  return list_cursor->index < list_cursor->list->length -1;
-}
-
-ExprHeader *flux_script_expr_list_next(ExprListCursor *list_cursor) {
-  if (list_cursor->current == NULL) {
-    PARSE_LOG(list_cursor->list, "First iteration inside list, first value at %x\n", &list_cursor->list->items);
-    // If there's no current item, send the *pointer* to the location of
-    // the first list item so that any expression data is set there
-    list_cursor->current = (ExprHeader*)(&(list_cursor->list->items));
-    return list_cursor->current;
-  }
-
-  ExprHeader *expr = list_cursor->current;
-  ExprHeader *sub_expr = NULL;
-  ExprListCursor sub_list_cursor;
-
-  PARSE_LOG(expr, "Next expr requested, current kind: %d\n", expr->kind);
-
-  switch(expr->kind) {
+  switch (expr->kind) {
   case ExprKindList:
     PARSE_LOG(expr, "Item is List\n");
 
     // Loop over the sub-list to get the position after the list is complete
-    flux_script_expr_list_cursor_init((ExprList *)expr, &sub_list_cursor);
-    PARSE_LOG(expr, "Sub list length %d\n", sub_list_cursor.list->length);
-    do {
-      sub_expr = flux_script_expr_list_next(&sub_list_cursor);
-      PARSE_LOG(expr, "Sub expr %d\n", sub_list_cursor.index);
-    } while (sub_list_cursor.index <= sub_list_cursor.list->length);
+    /* flux_script_expr_list_cursor_init((ExprList *)expr, &sub_list_cursor); */
+    /* PARSE_LOG(expr, "Sub list length %d\n", sub_list_cursor.list->length); */
+    /* do { */
+    /*   sub_expr = flux_script_expr_list_next(&sub_list_cursor); */
+    /*   PARSE_LOG(expr, "Sub expr %d\n", sub_list_cursor.index); */
+    /* } while (sub_list_cursor.index <= sub_list_cursor.list->length); */
 
-    list_cursor->current = sub_list_cursor.current;
-    PARSE_LOG(list_cursor->list, "NEXT of List: %x\n", list_cursor->current);
+    /* list_cursor->current = sub_list_cursor.current; */
+    /* PARSE_LOG(list_cursor->list, "NEXT of List: %x\n", list_cursor->current); */
+
+    // TODO: This is broken!
+    return 0;
     break;
 
   case ExprKindSymbol:
     PARSE_LOG(expr, "Item is Symbol\n");
-    list_cursor->current = (ExprHeader*)((uintptr_t)expr + sizeof(ExprSymbol) + ((ExprSymbol*)expr)->length + 1);
-    break;
-
+    return sizeof(ExprSymbol) + ((ExprSymbol *)expr)->length + 1;
   case ExprKindKeyword:
     PARSE_LOG(expr, "Item is Keyword\n");
-    list_cursor->current = (ExprHeader*)((uintptr_t)expr + sizeof(ExprKeyword) + ((ExprKeyword*)expr)->length + 1);
-    break;
-
+    return sizeof(ExprKeyword) + ((ExprKeyword *)expr)->length + 1;
   case ExprKindValue:
     PARSE_LOG(expr, "Item is Value\n");
-    list_cursor->current = (ExprHeader*)((uintptr_t)expr + sizeof(ExprHeader) + flux_script_value_size(&(((ExprValue *)expr)->value)));
-    break;
-
+    return sizeof(ExprHeader) + flux_script_value_size(&(((ExprValue *)expr)->value));
   default:
     PANIC("Unhandled expr type: %d\n", expr->kind);
   }
-
-  PARSE_LOG(expr, "NEXT item: %x (moved %d)\n", list_cursor->current, list_cursor->current - expr);
-
-  // Increment the index
-  list_cursor->index++;
-
-  return list_cursor->current;
 }
 
-ExprHeader *flux_script_expr_list_push(ExprListCursor *list_cursor) {
-  // TODO: This is duplicated with behavior in *_list_next, need to centralize
-  if (list_cursor->current == NULL) {
-    PARSE_LOG(list_cursor->list, "First push to list, first value at %x\n", &list_cursor->list->items);
-    // If there's no current item, send the *pointer* to the location of
-    // the first list item so that any expression data is set there
-    list_cursor->current = (ExprHeader*)(&(list_cursor->list->items));
-  }
-
-  list_cursor->list->length++;
-  PARSE_LOG(list_cursor->list, "Push new item on cursor at %x, new length: %d\n", list_cursor->current, list_cursor->list->length);
-  return list_cursor->current;
-}
-
-ExprHeader *flux_script_expr_list_init(ExprList *list, ExprListCursor *list_cursor) {
-  // Initialize the list's memory location
-  list->length = 0;
-  list->header.kind = ExprKindList;
-  list->items[0].kind = ExprKindNone;
-
-  // Initialize the cursor
-  flux_script_expr_list_cursor_init(list, list_cursor);
-}
-
-ExprList *flux_script_parse_list(VectorCursor *token_cursor, ExprListCursor *list_cursor) {
+ExprList *flux_script_parse_list(VectorCursor *token_cursor, VectorCursor *list_cursor) {
   PARSE_LOG(list_cursor->list, "Parse list starting at %x...\n", &list_cursor->list->items);
 
   while (flux_vector_cursor_has_next(token_cursor)) {
@@ -365,31 +307,29 @@ ExprList *flux_script_parse_list(VectorCursor *token_cursor, ExprListCursor *lis
         return list_cursor->list;
       }
     } else if (token->kind == TokenKindSymbol) {
-      ExprSymbol *symbol = (ExprSymbol*)flux_script_expr_list_push(list_cursor);
+      ExprSymbol symbol;
       PARSE_LOG(symbol, "Setting symbol: %s\n", ((TokenSymbol *)token)->string);
-      symbol->header.kind = ExprKindSymbol;
-      symbol->length = ((TokenSymbol*)token)->length;
-      strcpy(symbol->name, ((TokenSymbol*)token)->string);
-      symbol->is_quoted = ((TokenSymbol*)token)->is_quoted;
+      symbol.header.kind = ExprKindSymbol;
+      symbol.length = ((TokenSymbol*)token)->length;
+      strcpy(symbol.name, ((TokenSymbol*)token)->string);
+      symbol.is_quoted = ((TokenSymbol*)token)->is_quoted;
 
-      // Move the cursor forward
-      flux_script_expr_list_next(list_cursor);
+      flux_vector_push(list_cursor, &symbol);
     } else if (token->kind == TokenKindKeyword) {
-      ExprKeyword *keyword = (ExprKeyword*)flux_script_expr_list_push(list_cursor);
+      ExprKeyword keyword;
       PARSE_LOG(keyword, "Setting keyword: %s\n", ((TokenKeyword *)token)->string);
-      keyword->header.kind = ExprKindKeyword;
-      keyword->length = ((TokenKeyword*)token)->length;
-      strcpy(keyword->name, ((TokenKeyword*)token)->string);
+      keyword.header.kind = ExprKindKeyword;
+      keyword.length = ((TokenKeyword*)token)->length;
+      strcpy(keyword.name, ((TokenKeyword*)token)->string);
 
-      // Move the cursor forward
-      flux_script_expr_list_next(list_cursor);
+      flux_vector_push(list_cursor, &keyword);
     } else if (token->kind == TokenKindInteger) {
-      ExprValue *integer = (ExprValue*)flux_script_expr_list_push(list_cursor);
+      ExprValue integer;
       PARSE_LOG(integer, "Setting integer: %d\n", ((TokenInteger *)token)->number);
-      integer->header.kind = ExprKindValue;
+      integer.header.kind = ExprKindValue;
 
       // Set the value
-      ValueInteger *int_value = (ValueInteger *)&(integer->value);
+      ValueInteger *int_value = (ValueInteger *)&(integer.value);
       int_value->header.kind = ValueKindInteger;
       int_value->value = ((TokenInteger *)token)->number;
 
@@ -420,21 +360,14 @@ ExprList *flux_script_parse_list(VectorCursor *token_cursor, ExprListCursor *lis
 }
 
 ExprList *flux_script_parse(Vector token_vector) {
-  // This function will be called recursively for all lists so that
-  // we can maintain the ExprListIterator on the stack
-  //
-  // We start parsing by creating an initial list in memory for the
-  // top-level expression list, then we recursively walk the tree of
-  // lists.
-  //
-  // The whole tree is written in a linear strip of memory.  Since the
-  // high level unit of iteration are lists, we can recursively walk the
-  // tree.
+  VectorCursor list_cursor;
 
-  // Allocate the parse buffer if necessary
-  if (script_parse_buffer == NULL) {
-    script_parse_buffer = flux_memory_alloc(PARSE_BUFFER_INITIAL_SIZE);
+  // Allocate the parse vector if necessary
+  if (parse_vector == NULL) {
+    parse_vector = flux_vector_create(PARSE_BUFFER_INITIAL_SIZE, flux_script_expr_size);
     PARSE_LOG(script_parse_buffer, "Allocated %d bytes for parse buffer\n", PARSE_BUFFER_INITIAL_SIZE);
+  } else {
+    flux_vector_reset(parse_vector);
   }
 
   // Set the token cursor
@@ -443,8 +376,6 @@ ExprList *flux_script_parse(Vector token_vector) {
 
   // Create the top-level expression list
   ExprList *top_level_list = (ExprList*)script_parse_buffer;
-  ExprListCursor list_cursor;
-  flux_script_expr_list_init(top_level_list, &list_cursor);
 
   PARSE_LOG(list_cursor.list, "--- PARSING START ---\n");
 
@@ -593,11 +524,11 @@ ValueHeader *flux_script_eval(FILE *script_file) {
   if (token_vector != NULL && token_vector->length > 0) {
     // TODO: Loop over every expression at top-level and eval individually
     ValueCursor value_cursor;
-    ExprListCursor list_cursor;
+    VectorCursor list_cursor;
     ExprList *result = flux_script_parse(token_vector);
-    flux_script_expr_list_cursor_init(result, &list_cursor);
+    flux_vector_cursor_init(result, &list_cursor);
 
-    ExprHeader *next_expr = flux_script_expr_list_next(&list_cursor);
+    ExprHeader *next_expr = flux_vector_cursor_next(&list_cursor);
     return flux_script_eval_expr(next_expr);
   }
 

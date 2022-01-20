@@ -142,7 +142,7 @@ void init_graphics (int width, int height)
   }
 }
 
-ValueHeader *flux_graphics_func_show_preview_window(ExprListCursor *list_cursor, ValueCursor *value_cursor) {
+ValueHeader *flux_graphics_func_show_preview_window(VectorCursor *list_cursor, ValueCursor *value_cursor) {
   flux_log("ATTEMPTING TO LOAD WINDOW\n");
 
   // TODO: Pass actual width and height

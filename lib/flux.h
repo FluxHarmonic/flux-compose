@@ -23,11 +23,11 @@ typedef struct {
   void *current_item;
 } VectorCursor;
 
+extern Vector flux_vector_init(Vector vector, VectorItemSizeFunc item_size_func);
 extern Vector flux_vector_create(size_t initial_size, VectorItemSizeFunc item_size_func);
 extern void* flux_vector_cursor_next(VectorCursor *cursor);
 extern char flux_vector_cursor_has_next(VectorCursor *cursor);
 extern void* flux_vector_push(VectorCursor *cursor, void* item);
-extern void* flux_vector_push_size(VectorCursor *cursor, size_t size);
 extern void flux_vector_reset(Vector vector);
 extern void flux_vector_cursor_init(Vector vector, VectorCursor *cursor);
 
