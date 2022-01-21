@@ -17,15 +17,15 @@ Vector parse_vector = NULL;
 
 /* #define TOKEN_LOG(ptr, message, ...) \ */
 /*   flux_log_mem(ptr, "TOKEN | ");     \ */
-/*   flux_log(message __VA_OPT__(,) __VA_ARGS__); */
+/*   flux_log(message, ##__VA_ARGS__); */
 
 /* #define PARSE_LOG(ptr, message, ...) \ */
 /*   flux_log_mem(ptr, "PARSE | ");     \ */
-/*   flux_log(message __VA_OPT__(,) __VA_ARGS__); */
+/*   flux_log(message, ##__VA_ARGS__); */
 
 /* #define EVAL_LOG(ptr, message, ...)  \ */
 /*   flux_log_mem(ptr, "EVAL  | ");     \ */
-/*   flux_log(message __VA_OPT__(,) __VA_ARGS__); */
+/*   flux_log(message, ##__VA_ARGS__); */
 
 #define TOKEN_LOG(ptr, message, ...) {}
 #define PARSE_LOG(ptr, message, ...) {}
