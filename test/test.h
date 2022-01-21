@@ -25,7 +25,7 @@ extern char fail_message[2048];
 #define FAIL(message, ...)                                                     \
   tests_failed++;                                                              \
   printf("\e[1;91m  ✗ FAIL\e[0m %s\n", __func__);                              \
-  sprintf(fail_message, message __VA_OPT__(,) __VA_ARGS__);                    \
+  sprintf(fail_message, message, ##__VA_ARGS__);			       \
   printf("      %s\n\n", fail_message);                                        \
   return;
 
