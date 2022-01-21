@@ -24,5 +24,5 @@ int main() {
   // Final newline for clarity
   printf("\n");
 
-  return 0;
+  return tests_failed;
 }
