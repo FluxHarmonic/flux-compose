@@ -1,3 +1,5 @@
+[[https://github.com/FluxHarmonic/flux-compose/workflows/Compile%20project/badge.svg]]
+
 #+title: Flux Compose
 
 /A creative composition studio for Scheme hackers./
