@@ -518,7 +518,7 @@ ValueHeader *flux_script_eval(FILE *script_file) {
     // TODO: Loop over every expression at top-level and eval individually
     ValueCursor value_cursor;
     VectorCursor list_cursor;
-    ExprList *result = flux_script_parse(token_vector);
+    Vector result = flux_script_parse(token_vector);
     flux_vector_cursor_init(result, &list_cursor);
 
     ExprHeader *next_expr = flux_vector_cursor_next(&list_cursor);
