@@ -31,7 +31,7 @@ extern char fail_message[2048];
 
 #define ASSERT_INT(expected, actual)                                            \
   if (actual != expected) {                                                     \
-    FAIL("Expected integer: %d\n                   got: %d\n               at line: %d\n", expected, actual, __LINE__); \
+    FAIL("Expected integer: %ld\n                   got: %ld\n               at line: %d\n", (long int) expected, (long int) actual, __LINE__); \
   }
 
 void test_vector_suite();
