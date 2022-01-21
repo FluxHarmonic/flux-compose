@@ -4,9 +4,12 @@
 #include "test.h"
 #include "../lib/flux-internal.h"
 
+#define __stringify(s) str(s)
+#define str(s) #s
+
 #define ASSERT_KIND(_token, expected_kind)                                       \
   if (_token->kind != expected_kind) {                                           \
-    FAIL("Expected kind %d, got %s", #expected_kind, _token->kind);              \
+    FAIL("Expected kind %d, got %s", expected_kind, __stringify(_token->kind)); \
   }
 
 #define ASSERT_STR(expected, actual)                                             \
