@@ -7,14 +7,15 @@ find_package(Threads REQUIRED)
 
 # We could also use find_package(SDL), but that's only CMake 3.19
 pkg_check_modules(SDL2 REQUIRED IMPORTED_TARGET sdl2)
-pkg_check_modules(SDL2-Gfx REQUIRED IMPORTED_TARGET SDL2_gfx)
-pkg_check_modules(SDL2-Image REQUIRED IMPORTED_TARGET SDL2_image)
+pkg_check_modules(SDL2_GFX REQUIRED IMPORTED_TARGET SDL2_gfx)
+pkg_check_modules(SDL2_IMAGE REQUIRED IMPORTED_TARGET SDL2_image)
 
-include_directories(lib src)
+include_directories(lib src ${SDL2_INCLUDE_DIRS} ${SDL2_GFX_INCLUDE_DIRS}
+  ${SDL2_IMAGE_INCLUDE_DIRS})
 
 add_library(flux)
-target_link_libraries(flux PkgConfig::SDL2 PkgConfig::SDL2-Gfx
-  PkgConfig::SDL2-Image Threads::Threads)
+target_link_libraries(flux PkgConfig::SDL2 PkgConfig::SDL2_GFX
+  PkgConfig::SDL2_IMAGE Threads::Threads)
 
 add_executable(flux-compose)
 target_link_libraries(flux-compose flux)
