@@ -25,7 +25,7 @@ void flux_log_mem(void *ptr, const char *format, ...) {
   ENSURE_FP();
 
   // Prefix the line with the memory address
-  fprintf(log_file, "%x: ", ptr);
+  fprintf(log_file, "%p: ", ptr);
 
   va_list args;
   va_start(args, format);

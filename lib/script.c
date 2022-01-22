@@ -346,6 +346,8 @@ ExprList *flux_script_parse_list(VectorCursor *token_cursor, VectorCursor *list_
 
   // At this point, assume we've reached TokenKindNone
   PARSE_LOG(list_cursor->current_item, "EXIT list parse\n");
+
+  return NULL;
 }
 
 Vector flux_script_parse(Vector token_vector) {
@@ -416,6 +418,9 @@ ValueHeader *flux_script_value_copy(ValueHeader *value, ValueCursor *value_curso
   case ValueKindString:
     EVAL_LOG(value, "Copying string \"%s\" to %x\n", ((ValueString *)value)->string, new_value);
     memcpy(new_value, value, sizeof(ValueString) + ((ValueString *)value)->length + 1);
+    break;
+  default:
+    /* nothing */
     break;
   }
 
@@ -503,6 +508,9 @@ ValueHeader *flux_script_eval_expr(ExprHeader *expr) {
       }
     } else {
       PANIC("Call expression has expr of kind %d in first position!\n", call_symbol->kind);
+  default:
+    /* nothing */
+    break;
     }
 
     return NULL;
@@ -531,5 +539,5 @@ ValueHeader *flux_script_eval(FILE *script_file) {
 
 ValueHeader *flux_script_eval_string(char *script_string) {
   FILE *stream = flux_file_from_string(script_string);
-  flux_script_eval(stream);
+  return flux_script_eval(stream);
 }

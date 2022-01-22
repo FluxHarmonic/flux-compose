@@ -56,6 +56,8 @@ ValueHeader *flux_graphics_func_circle(VectorCursor *list_cursor, ValueCursor *v
 
   // TODO: Wrap this in a value type
   make_circle_struct(x, y, radius, color);
+
+  return NULL;
 }
 
 Uint32 scene_event_id = -1;
