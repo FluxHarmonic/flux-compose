@@ -137,7 +137,7 @@ void init_graphics (int width, int height)
 
     // TODO: Pass width and height through
     // Create the thread for SDL2
-    int rc = pthread_create(&graphics_thread_handle, NULL, render_loop, NULL);
+    pthread_create(&graphics_thread_handle, NULL, render_loop, NULL);
   } else {
     flux_log("Graphics thread already initialized...\n");
   }
