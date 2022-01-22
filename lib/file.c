@@ -1,5 +1,5 @@
+#include <flux.h>
 #include <stdio.h>
-#include "flux.h"
 
 FILE *flux_file_open(char *file_name, char *mode_string) {
   // TODO: Resolve relative file paths

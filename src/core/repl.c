@@ -1,5 +1,5 @@
+#include <flux.h>
 #include <stdio.h>
-#include "../../lib/flux.h"
 
 #define INPUT_BUFFER_LIMIT 2048
 
@@ -16,7 +16,7 @@ void flux_repl_start(FILE *fp) {
 
     // TODO: Print the value for true REPL
     flux_script_eval_string(input_buffer);
-    input_buffer[0]  = '\0';
+    input_buffer[0] = '\0';
   }
 }
 

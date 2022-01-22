@@ -1,6 +1,6 @@
-#include "../lib/flux-internal.h"
-#include "../lib/flux.h"
 #include "test.h"
+#include <flux-internal.h>
+#include <flux.h>
 
 Vector test_vector = NULL;
 

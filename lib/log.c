@@ -1,9 +1,12 @@
-#include <stdio.h>
 #include <stdarg.h>
+#include <stdio.h>
 
 FILE *log_file = NULL;
 
-#define ENSURE_FP() if (log_file == NULL) { log_file = stdout; }
+#define ENSURE_FP()                                                                                \
+  if (log_file == NULL) {                                                                          \
+    log_file = stdout;                                                                             \
+  }
 
 void flux_log_file_set(const char *file_path) {
   if (log_file == NULL) {

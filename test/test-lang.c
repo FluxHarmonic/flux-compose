@@ -2,7 +2,7 @@
 #include <errno.h>
 #include <string.h>
 #include "test.h"
-#include "../lib/flux-internal.h"
+#include <flux-internal.h>
 
 #define __stringify(s) str(s)
 #define str(s) #s

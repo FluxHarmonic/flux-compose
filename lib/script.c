@@ -1,8 +1,8 @@
+#include <flux-internal.h>
+#include <flux.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <string.h>
-#include <stdint.h>
-#include "flux.h"
-#include "flux-internal.h"
 
 void *script_value_buffer = NULL;
 
@@ -27,9 +27,18 @@ Vector parse_vector = NULL;
 /*   flux_log_mem(ptr, "EVAL  | ");     \ */
 /*   flux_log(message, ##__VA_ARGS__); */
 
-#define TOKEN_LOG(ptr, message, ...) (void) ptr; do {} while (0)
-#define PARSE_LOG(ptr, message, ...) (void) ptr; do {} while (0)
-#define EVAL_LOG(ptr, message, ...)  (void) ptr; do {} while (0)
+#define TOKEN_LOG(ptr, message, ...)                                                               \
+  (void)ptr;                                                                                       \
+  do {                                                                                             \
+  } while (0)
+#define PARSE_LOG(ptr, message, ...)                                                               \
+  (void)ptr;                                                                                       \
+  do {                                                                                             \
+  } while (0)
+#define EVAL_LOG(ptr, message, ...)                                                                \
+  (void)ptr;                                                                                       \
+  do {                                                                                             \
+  } while (0)
 
 typedef enum {
   TSTATE_NONE,
@@ -39,12 +48,12 @@ typedef enum {
   TSTATE_NUMBER,
 } TokenState;
 
-#define token_reset_state(token_state, str_ptr, str_buffer)  \
-  str_ptr = &str_buffer[0];                                  \
-  *str_ptr = '\0';                                           \
+#define token_reset_state(token_state, str_ptr, str_buffer)                                        \
+  str_ptr = &str_buffer[0];                                                                        \
+  *str_ptr = '\0';                                                                                 \
   token_state = TSTATE_NONE;
 
-#define FLAG_MINUS  1 << 31
+#define FLAG_MINUS 1 << 31
 #define FLAG_QUOTED 1 << 31
 
 int flux_flag_check(int value, int bit_mask) {
@@ -65,7 +74,7 @@ void token_add_char(char **str_ptr, char c) {
 }
 
 size_t flux_script_token_size(void *item) {
-  TokenHeader* token = item;
+  TokenHeader *token = item;
 
   switch (token->kind) {
   case TokenKindParen:
@@ -114,7 +123,7 @@ Vector flux_script_tokenize(FILE *script_file) {
         // TODO: Is the previous char a backslash?
         // Save the string token
         TokenString str_token;
-	TokenHeader *token;
+        TokenHeader *token;
 
         str_token.header.kind = TokenKindString;
         str_token.length = str_ptr - &str_buffer[0];
@@ -132,7 +141,7 @@ Vector flux_script_tokenize(FILE *script_file) {
       } else {
         // End the symbol
         TokenSymbol symbol_token;
-	TokenHeader *token;
+        TokenHeader *token;
 
         symbol_token.header.kind = TokenKindSymbol;
         symbol_token.length = str_ptr - &str_buffer[0];
@@ -161,8 +170,9 @@ Vector flux_script_tokenize(FILE *script_file) {
         // Put the character back on the stream to read it again
         ungetc(c, script_file);
 
-	token = flux_vector_push(&token_cursor, &keyword_token);
-        TOKEN_LOG(token, "Keyword - :%s (length: %d)\n", keyword_token.string, keyword_token.length);
+        token = flux_vector_push(&token_cursor, &keyword_token);
+        TOKEN_LOG(token, "Keyword - :%s (length: %d)\n", keyword_token.string,
+                  keyword_token.length);
         token_reset_state(token_state, str_ptr, str_buffer);
       }
     } else if (is_state(token_state, TSTATE_NUMBER)) {
@@ -241,11 +251,11 @@ typedef enum {
 } ParseState;
 
 size_t flux_script_value_size(ValueHeader *value) {
-  switch(value->kind) {
+  switch (value->kind) {
   case ValueKindInteger:
     return sizeof(ValueInteger);
   case ValueKindString:
-    return sizeof(ValueString) + ((ValueString*)value)->length + 1;
+    return sizeof(ValueString) + ((ValueString *)value)->length + 1;
   default:
     PANIC("Unhandled value type: %d\n", value->kind);
   }
@@ -256,7 +266,8 @@ size_t flux_script_expr_size(void *item) {
 
   switch (expr->kind) {
   case ExprKindList:
-    PARSE_LOG(expr, "Item is List (presumed size: %lu + %lu)\n", sizeof(ExprList), ((ExprList *)expr)->items.buffer_usage);
+    PARSE_LOG(expr, "Item is List (presumed size: %lu + %lu)\n", sizeof(ExprList),
+              ((ExprList *)expr)->items.buffer_usage);
     return sizeof(ExprList) + ((ExprList *)expr)->items.buffer_usage;
   case ExprKindSymbol:
     PARSE_LOG(expr, "Item is Symbol\n");
@@ -276,7 +287,8 @@ size_t flux_script_expr_size(void *item) {
 }
 
 ExprList *flux_script_parse_list(VectorCursor *token_cursor, VectorCursor *list_cursor) {
-  PARSE_LOG(list_cursor->vector, "Parse list starting at %x...\n", &list_cursor->vector->start_item);
+  PARSE_LOG(list_cursor->vector, "Parse list starting at %x...\n",
+            &list_cursor->vector->start_item);
 
   while (flux_vector_cursor_has_next(token_cursor)) {
     TokenHeader *token = flux_vector_cursor_next(token_cursor);
@@ -284,7 +296,7 @@ ExprList *flux_script_parse_list(VectorCursor *token_cursor, VectorCursor *list_
 
     // Parse sub-lists
     if (token->kind == TokenKindParen) {
-      if (((TokenParen*)token)->is_open) {
+      if (((TokenParen *)token)->is_open) {
         ExprList temp_sub_list;
         ExprList *sub_list;
         VectorCursor sub_list_cursor;
@@ -298,25 +310,30 @@ ExprList *flux_script_parse_list(VectorCursor *token_cursor, VectorCursor *list_
         // Push the new list onto the parent vector and set up a cursor
         sub_list = flux_vector_push(list_cursor, &temp_sub_list);
         sub_list->items.start_item = sub_list + 1;
-        PARSE_LOG(sub_list, "Created sub-vector for nested list (vector at %x)\n", &sub_list->items);
+        PARSE_LOG(sub_list, "Created sub-vector for nested list (vector at %x)\n",
+                  &sub_list->items);
         flux_vector_cursor_init(&sub_list->items, &sub_list_cursor);
 
-        PARSE_LOG(&sub_list->items, "This is the sub-list vector (func: %x)\n", sub_list->items.item_size_func);
+        PARSE_LOG(&sub_list->items, "This is the sub-list vector (func: %x)\n",
+                  sub_list->items.item_size_func);
         PARSE_LOG(&sub_list->items, "The real size func location is %x\n", flux_script_expr_size);
 
         // Parse the list contents recursively.  The sub-cursor will tell us
         // where to resume the parent list's data once this function completes.
-        PARSE_LOG(list_cursor->vector, "Begin sub-list parse starting at %x...\n", list_cursor->current_item);
+        PARSE_LOG(list_cursor->vector, "Begin sub-list parse starting at %x...\n",
+                  list_cursor->current_item);
         flux_script_parse_list(token_cursor, &sub_list_cursor);
 
         // Trace where we're headed next
-        PARSE_LOG(list_cursor->current_item, "Outer list will resume at %x\n", sub_list_cursor.current_item);
+        PARSE_LOG(list_cursor->current_item, "Outer list will resume at %x\n",
+                  sub_list_cursor.current_item);
 
         // Set the outer cursor to be where the inner cursor left off
         list_cursor->current_item = sub_list_cursor.current_item;
       } else {
-        PARSE_LOG(list_cursor->current_item, "END list, length %d...\n", list_cursor->vector->length);
-        return (ExprList*)((uintptr_t)list_cursor->vector - sizeof(ExprHeader));
+        PARSE_LOG(list_cursor->current_item, "END list, length %d...\n",
+                  list_cursor->vector->length);
+        return (ExprList *)((uintptr_t)list_cursor->vector - sizeof(ExprHeader));
       }
     } else if (token->kind == TokenKindSymbol) {
       ExprSymbol symbol;
@@ -324,25 +341,27 @@ ExprList *flux_script_parse_list(VectorCursor *token_cursor, VectorCursor *list_
 
       PARSE_LOG(list_cursor->current_item, "Setting symbol: %s\n", ((TokenSymbol *)token)->string);
       symbol.header.kind = ExprKindSymbol;
-      symbol.length = ((TokenSymbol*)token)->length;
-      strcpy(symbol.name, ((TokenSymbol*)token)->string);
-      symbol.is_quoted = ((TokenSymbol*)token)->is_quoted;
+      symbol.length = ((TokenSymbol *)token)->length;
+      strcpy(symbol.name, ((TokenSymbol *)token)->string);
+      symbol.is_quoted = ((TokenSymbol *)token)->is_quoted;
 
       final_symbol = flux_vector_push(list_cursor, &symbol);
       PARSE_LOG(final_symbol, "Pushed symbol: %s\n", final_symbol->name);
     } else if (token->kind == TokenKindKeyword) {
       ExprKeyword keyword;
 
-      PARSE_LOG(list_cursor->current_item, "Setting keyword: %s\n", ((TokenKeyword *)token)->string);
+      PARSE_LOG(list_cursor->current_item, "Setting keyword: %s\n",
+                ((TokenKeyword *)token)->string);
       keyword.header.kind = ExprKindKeyword;
-      keyword.length = ((TokenKeyword*)token)->length;
-      strcpy(keyword.name, ((TokenKeyword*)token)->string);
+      keyword.length = ((TokenKeyword *)token)->length;
+      strcpy(keyword.name, ((TokenKeyword *)token)->string);
 
       flux_vector_push(list_cursor, &keyword);
     } else if (token->kind == TokenKindInteger) {
       ExprInteger integer;
 
-      PARSE_LOG(list_cursor->current_item, "Setting integer: %d\n", ((TokenInteger *)token)->number);
+      PARSE_LOG(list_cursor->current_item, "Setting integer: %d\n",
+                ((TokenInteger *)token)->number);
       integer.header.kind = ExprKindInteger;
       integer.number = ((TokenInteger *)token)->number;
 
@@ -353,8 +372,8 @@ ExprList *flux_script_parse_list(VectorCursor *token_cursor, VectorCursor *list_
 
       PARSE_LOG(list_cursor->current_item, "Setting string: %s\n", ((TokenString *)token)->string);
       string.header.kind = ExprKindString;
-      string.length = ((TokenString*)token)->length;
-      strcpy(string.string, ((TokenString*)token)->string);
+      string.length = ((TokenString *)token)->length;
+      strcpy(string.string, ((TokenString *)token)->string);
 
       final_string = flux_vector_push(list_cursor, &string);
       PARSE_LOG(final_string, "Pushed string: %s\n", final_string->string);
@@ -399,7 +418,8 @@ Vector flux_script_parse(Vector token_vector) {
 ValueHeader *flux_script_value_next(ValueCursor *value_cursor) {
   ValueHeader *value = value_cursor->current;
 
-  EVAL_LOG(value_cursor->current, "Next value requested, current kind: %d\n", value_cursor->current->kind);
+  EVAL_LOG(value_cursor->current, "Next value requested, current kind: %d\n",
+           value_cursor->current->kind);
 
   switch (value->kind) {
   case ValueKindNone:
@@ -414,7 +434,8 @@ ValueHeader *flux_script_value_next(ValueCursor *value_cursor) {
     value += 1;
     break;
   case ValueKindString:
-    value = (ValueHeader *)((uintptr_t)value + sizeof(ValueString) + ((ValueString*)value)->length + 1);
+    value = (ValueHeader *)((uintptr_t)value + sizeof(ValueString) +
+                            ((ValueString *)value)->length + 1);
     break;
   default:
     PANIC("Unhandled value type: %d\n", value->kind);
@@ -429,7 +450,8 @@ ValueHeader *flux_script_value_next(ValueCursor *value_cursor) {
 }
 
 ValueHeader *flux_script_value_copy(ValueHeader *value, ValueCursor *value_cursor) {
-  ValueHeader *new_value = value_cursor->current;;
+  ValueHeader *new_value = value_cursor->current;
+  ;
 
   switch (value->kind) {
   case ValueKindInteger:
@@ -486,7 +508,8 @@ ValueHeader *flux_script_eval_expr(ExprHeader *expr) {
   // Allocate the parse buffer if necessary
   if (script_value_buffer == NULL) {
     script_value_buffer = flux_memory_alloc(VALUE_BUFFER_INITIAL_SIZE);
-    EVAL_LOG(script_value_buffer, "Allocated %d bytes for value buffer\n", VALUE_BUFFER_INITIAL_SIZE);
+    EVAL_LOG(script_value_buffer, "Allocated %d bytes for value buffer\n",
+             VALUE_BUFFER_INITIAL_SIZE);
   }
 
   value_cursor.current = script_value_buffer;
@@ -511,7 +534,7 @@ ValueHeader *flux_script_eval_expr(ExprHeader *expr) {
     // Initialize the cursor for the expression
 
     // First of all, grab the symbol at the beginning of the list
-    flux_vector_cursor_init(&((ExprList*)expr)->items, &arg_cursor);
+    flux_vector_cursor_init(&((ExprList *)expr)->items, &arg_cursor);
     call_symbol = flux_vector_cursor_next(&arg_cursor);
 
     // Look up symbol
@@ -534,9 +557,9 @@ ValueHeader *flux_script_eval_expr(ExprHeader *expr) {
       }
     } else {
       PANIC("Call expression has expr of kind %d in first position!\n", call_symbol->kind);
-  default:
-    /* nothing */
-    break;
+    default:
+      /* nothing */
+      break;
     }
 
     return NULL;

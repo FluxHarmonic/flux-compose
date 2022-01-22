@@ -1,6 +1,6 @@
+#include <flux-internal.h>
+#include <flux.h>
 #include <stdio.h>
-#include "flux.h"
-#include "flux-internal.h"
 
 // Initialize a Vector struct at a pre-existing location.
 //
@@ -26,8 +26,7 @@ Vector flux_vector_init(Vector vector, VectorItemSizeFunc item_size_func) {
 //
 // The structs used for vector items must use an enum for the item kind as
 // the first field for each struct that that will be stored in the vector.
-Vector flux_vector_create(size_t initial_size,
-                          VectorItemSizeFunc item_size_func) {
+Vector flux_vector_create(size_t initial_size, VectorItemSizeFunc item_size_func) {
   Vector vector = flux_memory_alloc(initial_size);
   flux_vector_init(vector, item_size_func);
   vector->buffer_size = initial_size;
@@ -50,7 +49,8 @@ void *flux_vector_cursor_next(VectorCursor *cursor) {
     return NULL;
   } else {
     // TODO: What happens when you've reached the end?
-    cursor->current_item = (void *)((uintptr_t)cursor->current_item + cursor->vector->item_size_func(cursor->current_item));
+    cursor->current_item = (void *)((uintptr_t)cursor->current_item +
+                                    cursor->vector->item_size_func(cursor->current_item));
     cursor->index++;
   }
 
@@ -63,8 +63,8 @@ char flux_vector_cursor_has_next(VectorCursor *cursor) {
 }
 
 // Adds a new item to the vector by copying the memory at the specified location.
-void* flux_vector_push(VectorCursor *cursor, void* item) {
-  void* current = NULL;
+void *flux_vector_push(VectorCursor *cursor, void *item) {
+  void *current = NULL;
   size_t item_size;
 
   // Initialize the cursor if it hasn't been yet

@@ -9,29 +9,29 @@ extern unsigned int tests_failed;
 
 extern char fail_message[2048];
 
-#define SUITE()                                                                \
-  printf("\n\n\e[1;33m • SUITE\e[0m %s\n", __func__);
+#define SUITE() printf("\n\n\e[1;33m • SUITE\e[0m %s\n", __func__);
 
-#define PASS()                                                                 \
-  tests_passed++;                                                              \
-  printf("\e[1;92m  ✓ PASS\e[0m %s\n", __func__);                              \
+#define PASS()                                                                                     \
+  tests_passed++;                                                                                  \
+  printf("\e[1;92m  ✓ PASS\e[0m %s\n", __func__);                                                  \
   return;
 
-#define SKIP()                                                                 \
-  tests_skipped++;                                                             \
-  printf("\e[1;33m 🛇 SKIP\e[0m %s\n", __func__);                               \
+#define SKIP()                                                                                     \
+  tests_skipped++;                                                                                 \
+  printf("\e[1;33m 🛇 SKIP\e[0m %s\n", __func__);                                                \
   return;
 
-#define FAIL(message, ...)                                                     \
-  tests_failed++;                                                              \
-  printf("\e[1;91m  ✗ FAIL\e[0m %s\n", __func__);                              \
-  sprintf(fail_message, message, ##__VA_ARGS__);			       \
-  printf("      %s\n\n", fail_message);                                        \
+#define FAIL(message, ...)                                                                         \
+  tests_failed++;                                                                                  \
+  printf("\e[1;91m  ✗ FAIL\e[0m %s\n", __func__);                                                  \
+  sprintf(fail_message, message, ##__VA_ARGS__);                                                   \
+  printf("      %s\n\n", fail_message);                                                            \
   return;
 
-#define ASSERT_INT(expected, actual)                                            \
-  if (actual != expected) {                                                     \
-    FAIL("Expected integer: %ld\n                   got: %ld\n               at line: %d\n", (long int) expected, (long int) actual, __LINE__); \
+#define ASSERT_INT(expected, actual)                                                               \
+  if (actual != expected) {                                                                        \
+    FAIL("Expected integer: %ld\n                   got: %ld\n               at line: %d\n",       \
+         (long int)expected, (long int)actual, __LINE__);                                          \
   }
 
 void test_vector_suite(void);
