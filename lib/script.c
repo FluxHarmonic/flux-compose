@@ -27,9 +27,9 @@ Vector parse_vector = NULL;
 /*   flux_log_mem(ptr, "EVAL  | ");     \ */
 /*   flux_log(message, ##__VA_ARGS__); */
 
-#define TOKEN_LOG(ptr, message, ...) {}
-#define PARSE_LOG(ptr, message, ...) {}
-#define EVAL_LOG(ptr, message, ...) {}
+#define TOKEN_LOG(ptr, message, ...) (void) ptr; do {} while (0)
+#define PARSE_LOG(ptr, message, ...) (void) ptr; do {} while (0)
+#define EVAL_LOG(ptr, message, ...)  (void) ptr; do {} while (0)
 
 typedef enum {
   TSTATE_NONE,
