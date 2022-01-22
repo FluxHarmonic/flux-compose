@@ -61,7 +61,7 @@ ValueHeader *flux_graphics_func_circle(VectorCursor *list_cursor, ValueCursor *v
 }
 
 Uint32 scene_event_id = -1;
-Uint32 register_set_scene_event() {
+Uint32 register_set_scene_event(void) {
   scene_event_id = SDL_RegisterEvents(1);
   return scene_event_id;
 }
@@ -81,7 +81,7 @@ void add_scene_member(Uint32 type, void* props) {
   }
 }
 
-void init_staging_scene() {
+void init_staging_scene(void) {
   Scene *new_scene = malloc(sizeof(Scene));
   new_scene->member_count = 0;
   new_scene->members = malloc(sizeof(SceneMember) * INITIAL_MEMBER_SIZE);
@@ -90,7 +90,7 @@ void init_staging_scene() {
   flux_log("New scene initialized!\n");
 }
 
-void promote_staging_scene() {
+void promote_staging_scene(void) {
   SDL_Event event;
   SDL_memset(&event, 0, sizeof(event));
   event.type = scene_event_id;
@@ -99,7 +99,7 @@ void promote_staging_scene() {
   flux_log("Promote staging scene!\n");
 }
 
-void flip_current_scene (Scene **current_scene_ptr) {
+void flip_current_scene(Scene **current_scene_ptr) {
   flux_log("Flipping the staging scene!\n");
   *current_scene_ptr = staging_scene;
   init_staging_scene();

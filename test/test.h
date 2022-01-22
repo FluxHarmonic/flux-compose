@@ -34,7 +34,7 @@ extern char fail_message[2048];
     FAIL("Expected integer: %ld\n                   got: %ld\n               at line: %d\n", (long int) expected, (long int) actual, __LINE__); \
   }
 
-void test_vector_suite();
-void test_lang_suite();
+void test_vector_suite(void);
+void test_lang_suite(void);
 
 #endif

@@ -7,7 +7,7 @@ unsigned int tests_failed = 0;
 
 char fail_message[2048];
 
-int main() {
+int main(void) {
   printf("\n\e[1;36mFlux Compose Test Runner\e[0m\n");
 
   test_vector_suite();

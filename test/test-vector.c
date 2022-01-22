@@ -37,7 +37,7 @@ size_t test_kind_size(void *item) {
   }
 }
 
-void test_vector_empty() {
+void test_vector_empty(void) {
   ASSERT_INT(0, test_vector->length);
   ASSERT_INT(512, test_vector->buffer_size);
 
@@ -48,7 +48,7 @@ void test_vector_empty() {
   PASS();
 }
 
-void test_vector_push() {
+void test_vector_push(void) {
   VectorCursor cursor;
   flux_vector_cursor_init(test_vector, &cursor);
 
@@ -82,7 +82,7 @@ void test_vector_push() {
   PASS();
 }
 
-void test_vector_cursor() {
+void test_vector_cursor(void) {
   VectorCursor cursor;
   flux_vector_cursor_init(test_vector, &cursor);
 
@@ -106,7 +106,7 @@ void test_vector_cursor() {
   PASS();
 }
 
-void test_vector_reset() {
+void test_vector_reset(void) {
   flux_vector_reset(test_vector);
 
   TestHeader *first = test_vector->start_item;
@@ -116,7 +116,7 @@ void test_vector_reset() {
   PASS();
 }
 
-void test_vector_suite() {
+void test_vector_suite(void) {
   SUITE();
 
   // Create the test vector first

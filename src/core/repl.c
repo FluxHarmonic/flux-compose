@@ -21,9 +21,9 @@ void flux_repl_start(FILE *fp) {
   }
 }
 
-void flux_repl_start_stdin() {
+void flux_repl_start_stdin(void) {
   flux_repl_start(stdin);
 }
 
-void flux_repl_start_socket() {
+void flux_repl_start_socket(void) {
 }

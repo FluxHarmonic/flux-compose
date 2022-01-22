@@ -16,7 +16,8 @@ Scene *current_scene = NULL;
 SDL_Renderer *renderer = NULL;
 
 Uint8 save_requested = 0;
-void request_render_to_file() {
+
+void request_render_to_file(void) {
   save_requested = 1;
 }
 
