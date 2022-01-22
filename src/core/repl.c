@@ -4,7 +4,6 @@
 #define INPUT_BUFFER_LIMIT 2048
 
 void flux_repl_start(FILE *fp) {
-  unsigned int i = 0;
   char input_buffer[INPUT_BUFFER_LIMIT];
   input_buffer[0] = '\0';
 

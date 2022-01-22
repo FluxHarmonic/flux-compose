@@ -64,14 +64,14 @@ void render_to_file(SDL_Renderer *renderer) {
 }
 
 void* render_loop(void* arg) {
+  bool quit = false;
+  SDL_Event event;
+
   // Create the preview window
   SDL_Window *window = SDL_CreateWindow("Flux Preview", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 1280, 720, SDL_WINDOW_OPENGL);
 
   // Create the renderer for the window
   renderer = SDL_CreateRenderer(window, -1, 0);
-
-  bool quit = false;
-  SDL_Event event;
 
   while (!quit) {
       SDL_WaitEvent(&event);

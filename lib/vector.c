@@ -65,6 +65,7 @@ char flux_vector_cursor_has_next(VectorCursor *cursor) {
 // Adds a new item to the vector by copying the memory at the specified location.
 void* flux_vector_push(VectorCursor *cursor, void* item) {
   void* current = NULL;
+  size_t item_size;
 
   // Initialize the cursor if it hasn't been yet
   // TODO: Error in this case instead?
@@ -74,7 +75,7 @@ void* flux_vector_push(VectorCursor *cursor, void* item) {
   }
 
   // Copy the contents of item
-  size_t item_size = cursor->vector->item_size_func(item);
+  item_size = cursor->vector->item_size_func(item);
   memcpy(cursor->current_item, item, item_size);
 
   // TODO: Resize when needed
