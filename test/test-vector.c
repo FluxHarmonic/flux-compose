@@ -1,6 +1,6 @@
-#include "../lib/flux-internal.h"
-#include "../lib/flux.h"
 #include "test.h"
+#include <flux-internal.h>
+#include <flux.h>
 
 Vector test_vector = NULL;
 
@@ -37,22 +37,26 @@ size_t test_kind_size(void *item) {
   }
 }
 
-void test_vector_empty() {
+void test_vector_empty(void) {
+  VectorCursor cursor;
+
   ASSERT_INT(0, test_vector->length);
   ASSERT_INT(512, test_vector->buffer_size);
 
-  VectorCursor cursor;
   flux_vector_cursor_init(test_vector, &cursor);
   ASSERT_INT(0, flux_vector_cursor_has_next(&cursor));
 
   PASS();
 }
 
-void test_vector_push() {
+void test_vector_push(void) {
   VectorCursor cursor;
+  TestFixed fixed1;
+  TestVariable var;
+  TestFixed fixed2;
+
   flux_vector_cursor_init(test_vector, &cursor);
 
-  TestFixed fixed1;
   fixed1.header.kind = TestKindFixed;
   fixed1.x = 50;
   fixed1.y = 40;
@@ -61,7 +65,6 @@ void test_vector_push() {
   ASSERT_INT(0, cursor.index);
   ASSERT_INT(1, test_vector->length);
 
-  TestVariable var;
   var.header.kind = TestKindVariable;
   var.length = 5;
   strcpy(var.name, "Test!");
@@ -70,7 +73,6 @@ void test_vector_push() {
   ASSERT_INT(1, cursor.index);
   ASSERT_INT(2, test_vector->length);
 
-  TestFixed fixed2;
   fixed2.header.kind = TestKindFixed;
   fixed2.x = 200;
   fixed2.y = -10;
@@ -82,41 +84,48 @@ void test_vector_push() {
   PASS();
 }
 
-void test_vector_cursor() {
+void test_vector_cursor(void) {
   VectorCursor cursor;
+  TestFixed *fixed1;
+  TestVariable *var;
+  TestFixed *fixed2;
+  TestHeader *last;
+
   flux_vector_cursor_init(test_vector, &cursor);
 
-  TestFixed *fixed1 = flux_vector_cursor_next(&cursor);
+  fixed1 = flux_vector_cursor_next(&cursor);
   ASSERT_INT(0, cursor.index);
   ASSERT_INT(TestKindFixed, fixed1->header.kind);
 
-  TestVariable *var = flux_vector_cursor_next(&cursor);
+  var = flux_vector_cursor_next(&cursor);
   ASSERT_INT(1, cursor.index);
   ASSERT_INT(TestKindVariable, var->header.kind);
 
-  TestFixed *fixed2 = flux_vector_cursor_next(&cursor);
+  fixed2 = flux_vector_cursor_next(&cursor);
   ASSERT_INT(2, cursor.index);
   ASSERT_INT(TestKindFixed, fixed2->header.kind);
 
   // There should be an item with kind = 0 at the end
   ASSERT_INT(0, flux_vector_cursor_has_next(&cursor));
-  TestHeader *last = flux_vector_cursor_next(&cursor);
+  last = flux_vector_cursor_next(&cursor);
   ASSERT_INT(NULL, last);
 
   PASS();
 }
 
-void test_vector_reset() {
+void test_vector_reset(void) {
+  TestHeader *first;
+
   flux_vector_reset(test_vector);
 
-  TestHeader *first = test_vector->start_item;
+  first = test_vector->start_item;
   ASSERT_INT(0, test_vector->length);
   ASSERT_INT(TestKindNone, first->kind);
 
   PASS();
 }
 
-void test_vector_suite() {
+void test_vector_suite(void) {
   SUITE();
 
   // Create the test vector first

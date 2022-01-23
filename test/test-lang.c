@@ -2,7 +2,7 @@
 #include <errno.h>
 #include <string.h>
 #include "test.h"
-#include "../lib/flux-internal.h"
+#include <flux-internal.h>
 
 #define __stringify(s) str(s)
 #define str(s) #s
@@ -51,10 +51,12 @@ TokenHeader *tokenize(char *input, VectorCursor *cursor) {
 Vector parse(char *input, VectorCursor *list_cursor) {
   FILE *stream = flux_file_from_string(input);
   Vector token_vector = flux_script_tokenize(stream);
+  Vector expr_vector;
+
   fclose(stream);
 
   // Set up the cursor
-  Vector expr_vector = flux_script_parse(token_vector);
+  expr_vector = flux_script_parse(token_vector);
   flux_vector_cursor_init(expr_vector, list_cursor);
 
   return expr_vector;
@@ -63,15 +65,16 @@ Vector parse(char *input, VectorCursor *list_cursor) {
 ValueHeader *eval(char *input) {
   FILE *stream = flux_file_from_string(input);
   Vector token_vector = flux_script_tokenize(stream);
+  Vector result;
+
   fclose(stream);
 
   // Eval the resulting expression and return it
-  ValueCursor value_cursor;
-  Vector result = flux_script_parse(token_vector);
+  result = flux_script_parse(token_vector);
   return flux_script_eval_expr((ExprHeader *)&result->start_item);
 }
 
-void test_lang_tokenize_empty() {
+void test_lang_tokenize_empty(void) {
   VectorCursor token_cursor;
   TokenHeader *token = tokenize("   ", &token_cursor);
 
@@ -80,7 +83,7 @@ void test_lang_tokenize_empty() {
   PASS();
 }
 
-void test_lang_tokenize_parens() {
+void test_lang_tokenize_parens(void) {
   VectorCursor token_cursor;
   TokenHeader *token = tokenize("()", &token_cursor);
 
@@ -94,7 +97,7 @@ void test_lang_tokenize_parens() {
   PASS();
 }
 
-void test_lang_tokenize_strings() {
+void test_lang_tokenize_strings(void) {
   VectorCursor token_cursor;
   TokenHeader *token = tokenize("\"Hello world!\"", &token_cursor);
 
@@ -106,7 +109,7 @@ void test_lang_tokenize_strings() {
   PASS();
 }
 
-void test_lang_tokenize_symbols() {
+void test_lang_tokenize_symbols(void) {
   VectorCursor token_cursor;
   TokenHeader *token = tokenize("hello-world 'hello_world h3ll0w0rld", &token_cursor);
 
@@ -129,7 +132,7 @@ void test_lang_tokenize_symbols() {
   PASS();
 }
 
-void test_lang_tokenize_keywords() {
+void test_lang_tokenize_keywords(void) {
   VectorCursor token_cursor;
   TokenHeader *token = tokenize(":hello-world :hello_world :h3ll0w0rld", &token_cursor);
 
@@ -149,7 +152,7 @@ void test_lang_tokenize_keywords() {
   PASS();
 }
 
-void test_lang_tokenize_numbers() {
+void test_lang_tokenize_numbers(void) {
   VectorCursor token_cursor;
   TokenHeader *token = tokenize("1 -20 300", &token_cursor);
 
@@ -169,7 +172,7 @@ void test_lang_tokenize_numbers() {
   PASS();
 }
 
-void test_lang_tokenize_expressions() {
+void test_lang_tokenize_expressions(void) {
   VectorCursor token_cursor;
   TokenHeader *token =
       tokenize("(circle :name 'circle1 :x 200 :y -15)", &token_cursor);
@@ -215,7 +218,7 @@ void test_lang_tokenize_expressions() {
   PASS();
 }
 
-void test_lang_tokenize_single_symbol_list() {
+void test_lang_tokenize_single_symbol_list(void) {
   VectorCursor token_cursor;
   TokenHeader *token = tokenize("(circle)", &token_cursor);
 
@@ -235,9 +238,11 @@ void test_lang_tokenize_single_symbol_list() {
   PASS();
 }
 
-void test_lang_parse_list() {
+void test_lang_parse_list(void) {
   ExprHeader *expr = NULL;
   VectorCursor list_cursor;
+  VectorCursor sub_list_cursor;
+
   parse("(circle :name \"circle1\" :x 200 :y -15)", &list_cursor);
 
   // Every result is wrapped in a top-level list
@@ -245,7 +250,6 @@ void test_lang_parse_list() {
   ASSERT_EQ(ExprKindList, expr->kind);
 
   // Prepare a cursor for the sub list
-  VectorCursor sub_list_cursor;
   flux_vector_cursor_init(&((ExprList*)expr)->items, &sub_list_cursor);
 
   // circle
@@ -289,26 +293,26 @@ void test_lang_parse_list() {
   PASS();
 }
 
-void test_lang_parse_multiple_exprs() {
-  ExprHeader *expr = NULL;
+void test_lang_parse_multiple_exprs(void) {
   VectorCursor list_cursor;
   parse("(circle 200) (do-something)", &list_cursor);
 
   /* FAIL("Not implemented yet."); */
 }
 
-void test_lang_parse_nested_lists() {
-  ExprHeader *expr = NULL;
+void test_lang_parse_nested_lists(void) {
   VectorCursor list_cursor;
   parse("(circle :color (rgb 255 0 0))", &list_cursor);
 
   /* FAIL("Not implemented yet."); */
 }
 
-void test_lang_eval_integer() {
+void test_lang_eval_integer(void) {
+  ValueHeader *value;
+
   SKIP();
 
-  ValueHeader *value = eval("311");
+  value = eval("311");
 
   ASSERT_EQ(ValueKindInteger, value->kind);
   // TODO: I shouldn't have to dereference this, rethink the macro
@@ -317,10 +321,12 @@ void test_lang_eval_integer() {
   PASS();
 }
 
-void test_lang_eval_string() {
+void test_lang_eval_string(void) {
+  ValueHeader *value;
+
   SKIP();
 
-  ValueHeader *value = eval("\"Flux Harmonic\"");
+  value = eval("\"Flux Harmonic\"");
 
   ASSERT_EQ(ValueKindString, value->kind);
   ASSERT_STR("Flux Harmonic", ((ValueString *)value)->string);
@@ -328,10 +334,12 @@ void test_lang_eval_string() {
   PASS();
 }
 
-void test_lang_eval_basic_call() {
+void test_lang_eval_basic_call(void) {
+  ValueHeader *value;
+
   SKIP();
 
-  ValueHeader *value = eval("(add 1 2)");
+  value = eval("(add 1 2)");
 
   ASSERT_EQ(ValueKindInteger, value->kind);
   ASSERT_INT_VALUE(*value, 3);
@@ -339,7 +347,7 @@ void test_lang_eval_basic_call() {
   PASS();
 }
 
-void test_lang_suite() {
+void test_lang_suite(void) {
   SUITE();
 
   // TODO: Need tests for error cases!

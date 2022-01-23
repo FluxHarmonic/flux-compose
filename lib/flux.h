@@ -25,9 +25,9 @@ typedef struct {
 
 extern Vector flux_vector_init(Vector vector, VectorItemSizeFunc item_size_func);
 extern Vector flux_vector_create(size_t initial_size, VectorItemSizeFunc item_size_func);
-extern void* flux_vector_cursor_next(VectorCursor *cursor);
+extern void *flux_vector_cursor_next(VectorCursor *cursor);
 extern char flux_vector_cursor_has_next(VectorCursor *cursor);
-extern void* flux_vector_push(VectorCursor *cursor, void* item);
+extern void *flux_vector_push(VectorCursor *cursor, void *item);
 extern void flux_vector_reset(Vector vector);
 extern void flux_vector_cursor_init(Vector vector, VectorCursor *cursor);
 
@@ -71,10 +71,10 @@ typedef struct SceneType {
   SceneMember *members;
 } Scene;
 
-extern Uint32 register_set_scene_event();
-extern void init_staging_scene();
-extern void promote_staging_scene();
-extern void flip_current_scene();
+extern Uint32 register_set_scene_event(void);
+extern void init_staging_scene(void);
+extern void promote_staging_scene(void);
+extern void flip_current_scene(Scene **);
 extern void render_scene(SDL_Renderer *, Scene *);
 
 // Scripting ----------------------------------------
@@ -109,7 +109,7 @@ typedef struct {
 
 typedef struct {
   ValueHeader header;
-  void* entity;
+  void *entity;
 } ValueEntity;
 
 typedef struct {
@@ -121,9 +121,9 @@ extern ValueHeader *flux_script_eval_string(char *script_string);
 
 // Utils --------------------------------------------
 
-#define PANIC(message, ...)                                        \
-  flux_log("\n\e[1;31mPANIC\e[0m in \e[0;93m%s\e[0m: ", __func__); \
-  flux_log(message, ##__VA_ARGS__);                                \
+#define PANIC(message, ...)                                                                        \
+  flux_log("\n\e[1;31mPANIC\e[0m in \e[0;93m%s\e[0m: ", __func__);                                 \
+  flux_log(message, ##__VA_ARGS__);                                                                \
   exit(1);
 
 #endif

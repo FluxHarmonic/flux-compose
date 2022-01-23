@@ -1,5 +1,5 @@
-#include <stdio.h>
 #include <ctype.h>
+#include <stdio.h>
 #include <stdlib.h>
 
 void *flux_memory_alloc(size_t size) {
