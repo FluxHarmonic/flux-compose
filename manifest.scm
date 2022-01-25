@@ -10,6 +10,10 @@
    ;; Guile
    "guile"
 
+   ;; OpenGL and GLFW
+   "mesa"
+   "glfw"
+
    ;; SDL
    "sdl2"
    "sdl2-image"

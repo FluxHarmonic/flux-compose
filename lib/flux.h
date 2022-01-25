@@ -42,6 +42,14 @@ extern void flux_log(const char *format, ...);
 extern void flux_log_mem(void *ptr, const char *format, ...);
 extern void flux_log_file_set(const char *file_path);
 
+// Graphics ---------------------------------------
+
+typedef struct _FluxWindow *FluxWindow;
+
+extern int flux_graphics_init(void);
+extern FluxWindow flux_graphics_window_create(int width, int height, const char *title);
+extern void flux_graphics_window_destroy(FluxWindow window);
+
 // Scene ------------------------------------------
 
 // Member types

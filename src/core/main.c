@@ -8,16 +8,17 @@ int main(int argc, char **argv) {
   /*     "/home/daviwil/Projects/Code/flux-compose/examples/basic-gfx.fxs",
    * "r"); */
 
-  FILE *script_file = flux_file_from_string("(show-preview-window 1280 720)\n");
+  /* FILE *script_file = flux_file_from_string("(show-preview-window 1280 720)\n"); */
 
-  if (script_file == NULL) {
-    printf("Could not load script file!\n");
-    exit(1);
-  }
+  /* if (script_file == NULL) { */
+  /*   printf("Could not load script file!\n"); */
+  /*   exit(1); */
+  /* } */
 
-  /* flux_script_eval(script_file); */
+  /* flux_repl_start_stdin(); */
 
-  flux_repl_start_stdin();
+  flux_graphics_init();
+  flux_graphics_window_create(1280, 720, "flux compose");
 
   return 0; /* never reached, see inner_main */
 }
