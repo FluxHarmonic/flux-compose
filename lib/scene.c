@@ -1,6 +1,7 @@
-#include <SDL.h>
-#include <SDL2_gfxPrimitives.h>
+#include <inttypes.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 #include <flux-internal.h>
 #include <flux.h>
@@ -15,7 +16,7 @@ Scene *staging_scene = NULL;
 // - Type of thing to draw
 // - Specific struct of properties for the thing to be drawn
 
-Color *make_color_struct(Uint8 r, Uint8 g, Uint8 b, Uint8 a) {
+Color *make_color_struct(uint8_t r, uint8_t g, uint8_t b, uint8_t a) {
   Color *color = malloc(sizeof(Color));
   color->r = r;
   color->g = g;
@@ -25,7 +26,7 @@ Color *make_color_struct(Uint8 r, Uint8 g, Uint8 b, Uint8 a) {
   return color;
 }
 
-Circle *make_circle_struct(Sint16 x, Sint16 y, Sint16 radius, Color *color) {
+Circle *make_circle_struct(int16_t x, int16_t y, int16_t radius, Color *color) {
   Circle *circle = malloc(sizeof(Circle));
   circle->x = x;
   circle->y = y;
@@ -36,7 +37,7 @@ Circle *make_circle_struct(Sint16 x, Sint16 y, Sint16 radius, Color *color) {
 }
 
 ValueHeader *flux_graphics_func_circle(VectorCursor *list_cursor, ValueCursor *value_cursor) {
-  Sint16 x = 0, y = 0, radius = 0;
+  int16_t x = 0, y = 0, radius = 0;
   Color *color = NULL;
 
   // Read values from K/V pairs
@@ -60,13 +61,7 @@ ValueHeader *flux_graphics_func_circle(VectorCursor *list_cursor, ValueCursor *v
   return NULL;
 }
 
-Uint32 scene_event_id = -1;
-Uint32 register_set_scene_event(void) {
-  scene_event_id = SDL_RegisterEvents(1);
-  return scene_event_id;
-}
-
-void add_scene_member(Uint32 type, void *props) {
+void add_scene_member(uint32_t type, void *props) {
   // Add the member in the member array
   // TODO: Check if we've reached the size limit!
   if (staging_scene != NULL) {
@@ -91,10 +86,10 @@ void init_staging_scene(void) {
 }
 
 void promote_staging_scene(void) {
-  SDL_Event event;
-  SDL_memset(&event, 0, sizeof(event));
-  event.type = scene_event_id;
-  SDL_PushEvent(&event);
+  /* SDL_Event event; */
+  /* SDL_memset(&event, 0, sizeof(event)); */
+  /* event.type = scene_event_id; */
+  /* SDL_PushEvent(&event); */
 
   flux_log("Promote staging scene!\n");
 }
@@ -105,20 +100,21 @@ void flip_current_scene(Scene **current_scene_ptr) {
   init_staging_scene();
 }
 
-void render_filled_circle(SDL_Renderer *renderer, Circle *circle) {
-  // Draw a circle
-  Color *color = circle->color;
-  filledCircleRGBA(renderer, circle->x, circle->y, circle->radius, color->r, color->g, color->b,
-                   color->a);
-}
+/* void render_filled_circle(SDL_Renderer *renderer, Circle *circle) { */
+/*   // Draw a circle */
+/*   Color *color = circle->color; */
+/*   filledCircleRGBA(renderer, circle->x, circle->y, circle->radius, color->r, color->g, color->b,
+ */
+/*                    color->a); */
+/* } */
 
-void render_scene(SDL_Renderer *renderer, Scene *scene) {
-  // Draw the scene
-  for (int i = 0; i < scene->member_count; i++) {
-    switch (scene->members[i].type) {
-    case TYPE_CIRCLE:
-      render_filled_circle(renderer, scene->members[i].props);
-      break;
-    }
-  }
-}
+/* void render_scene(SDL_Renderer *renderer, Scene *scene) { */
+/*   // Draw the scene */
+/*   for (int i = 0; i < scene->member_count; i++) { */
+/*     switch (scene->members[i].type) { */
+/*     case TYPE_CIRCLE: */
+/*       render_filled_circle(renderer, scene->members[i].props); */
+/*       break; */
+/*     } */
+/*   } */
+/* } */

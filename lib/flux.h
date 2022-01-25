@@ -1,9 +1,10 @@
 #ifndef __FLUX_H
 #define __FLUX_H
 
-#include <SDL.h>
+#include <inttypes.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 // Memory -----------------------------------------
 
@@ -47,8 +48,14 @@ extern void flux_log_file_set(const char *file_path);
 typedef struct _FluxWindow *FluxWindow;
 
 extern int flux_graphics_init(void);
+extern void flux_graphics_end(void);
+
 extern FluxWindow flux_graphics_window_create(int width, int height, const char *title);
+extern void flux_graphics_window_show(FluxWindow window);
 extern void flux_graphics_window_destroy(FluxWindow window);
+
+extern void flux_graphics_loop_start(FluxWindow window);
+extern void flux_graphics_loop_wait(void);
 
 // Scene ------------------------------------------
 
@@ -56,34 +63,34 @@ extern void flux_graphics_window_destroy(FluxWindow window);
 #define TYPE_CIRCLE 2
 
 typedef struct ColorType {
-  Uint8 r;
-  Uint8 g;
-  Uint8 b;
-  Uint8 a;
+  uint8_t r;
+  uint8_t g;
+  uint8_t b;
+  uint8_t a;
 } Color;
 
 typedef struct CircleType {
-  Sint16 x;
-  Sint16 y;
-  Sint16 radius;
+  int16_t x;
+  int16_t y;
+  int16_t radius;
   Color *color;
 } Circle;
 
 typedef struct SceneMemberType {
-  Uint32 type;
+  uint32_t type;
   void *props;
 } SceneMember;
 
 typedef struct SceneType {
-  Uint32 member_count;
+  uint32_t member_count;
   SceneMember *members;
 } Scene;
 
-extern Uint32 register_set_scene_event(void);
+extern uint32_t register_set_scene_event(void);
 extern void init_staging_scene(void);
 extern void promote_staging_scene(void);
 extern void flip_current_scene(Scene **);
-extern void render_scene(SDL_Renderer *, Scene *);
+/* extern void render_scene(SDL_Renderer *, Scene *); */
 
 // Scripting ----------------------------------------
 

@@ -12,10 +12,4 @@
 
    ;; OpenGL and GLFW
    "mesa"
-   "glfw"
-
-   ;; SDL
-   "sdl2"
-   "sdl2-image"
-   "sdl2-gfx"
-   "sdl2-ttf"))
+   "glfw"))

@@ -1,4 +1,5 @@
 #include <flux-internal.h>
+#include <ctype.h>
 #include <flux.h>
 #include <stdint.h>
 #include <stdio.h>

@@ -1,6 +1,8 @@
 #include <flux-internal.h>
 #include <flux.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 // Initialize a Vector struct at a pre-existing location.
 //
