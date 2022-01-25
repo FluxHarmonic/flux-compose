@@ -13,7 +13,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get --no-install-recommends -y install guile-3.0 guile-3.0-dev guile-3.0-libs libsdl2-dev libsdl2-gfx-dev libsdl2-image-dev make pkg-config
+          sudo apt-get --no-install-recommends -y install guile-3.0 guile-3.0-dev guile-3.0-libs libsdl2-dev libsdl2-gfx-dev libsdl2-image-dev libglfw3 libglfw3-dev mesa-common-dev make pkg-config
 
       - name: Configure
         run: cmake -S. -Bbuild -DCMAKE_BUILD_TYPE=Release
