@@ -12,13 +12,14 @@ struct _FluxWindow {
 };
 
 FluxWindow flux_graphics_window_create(int width, int height, const char *title) {
+  FluxWindow window;
   GLFWwindow* glfwWindow = glfwCreateWindow(width, height, title, NULL, NULL);
   if (!glfwWindow) {
     flux_log("Could not create GLFW window!\n");
     return NULL;
   }
 
-  FluxWindow window = malloc(sizeof(struct _FluxWindow));
+  window= malloc(sizeof(struct _FluxWindow));
   window->glfwWindow = glfwWindow;
 
   return window;
@@ -26,7 +27,7 @@ FluxWindow flux_graphics_window_create(int width, int height, const char *title)
 
 void flux_graphics_window_destroy(FluxWindow window) {
   if (window != NULL) {
-    glfwDestroyWindow(window);
+    glfwDestroyWindow(window->glfwWindow);
     window->glfwWindow = NULL;
     free(window);
   }

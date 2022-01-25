@@ -11,7 +11,10 @@ void flux_repl_start(FILE *fp) {
 
   while (!feof(fp)) {
     printf("> ");
-    fgets(input_buffer, INPUT_BUFFER_LIMIT, fp);
+    if (fgets(input_buffer, INPUT_BUFFER_LIMIT, fp) == NULL) {
+      PANIC("Error in fgets");
+    }
+
     flux_log("EXPR: %s\n", input_buffer);
 
     // TODO: Print the value for true REPL
