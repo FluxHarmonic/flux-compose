@@ -1,5 +1,6 @@
 #include <GLFW/glfw3.h>
 #include <flux.h>
+#include <flux-internal.h>
 #include <inttypes.h>
 #include <math.h>
 #include <pthread.h>
@@ -13,6 +14,9 @@ struct _FluxWindow {
   GLFWwindow *glfwWindow;
 };
 
+// TODO: Eventually store this in the scripting layer memory
+FluxWindow preview_window;
+
 void glfw_error_callback(int error, const char *description) {
   flux_log("GLFW error %d: %s\n", error, description);
 }
@@ -24,7 +28,7 @@ void flux_graphics_window_size_callback(GLFWwindow *glfwWindow, int width, int h
 
   window = glfwGetWindowUserPointer(glfwWindow);
   if (!window) {
-    flux_log("Missing window user pointer\n");
+    flux_log("Cannot get FluxWindow from GLFWwindow!\n");
     return;
   }
 
@@ -52,6 +56,7 @@ FluxWindow flux_graphics_window_create(int width, int height, const char *title)
   window->width = width;
   window->height = height;
 
+  // Set the "user pointer" of the GLFW window to our window
   glfwSetWindowUserPointer(glfwWindow, window);
 
   // Respond to window size changes
@@ -141,7 +146,7 @@ void *flux_graphics_render_loop(void *arg) {
     glOrtho(0.f, (float)window->width, (float)window->height, 0.f, -1.f, 1.f);
     glMatrixMode(GL_MODELVIEW);
 
-    // Clear the screen to red
+    // Clear the screen
     glClearColor(0.0, 0.0, 0.0, 1.0);
     glClear(GL_COLOR_BUFFER_BIT);
 
@@ -172,7 +177,9 @@ void flux_graphics_loop_start(FluxWindow window) {
 }
 
 void flux_graphics_loop_wait(void) {
-  pthread_join(flux_graphics_thread_handle, NULL);
+  if (flux_graphics_thread_handle) {
+    pthread_join(flux_graphics_thread_handle, NULL);
+  }
 }
 
 int flux_graphics_init() {
@@ -199,4 +206,20 @@ int flux_graphics_init() {
 
 void flux_graphics_end(void) {
   glfwTerminate();
+}
+
+ValueHeader *flux_graphics_func_show_preview_window(VectorCursor *list_cursor,
+                                                    ValueCursor *value_cursor) {
+  // TODO: Extract width and height parmeters
+
+  if (preview_window == NULL) {
+    // Start the loop and wait until it finishes
+    flux_graphics_init();
+    preview_window = flux_graphics_window_create(1280, 720, "Flux Compose");
+    flux_graphics_window_show(preview_window);
+    flux_graphics_loop_start(preview_window);
+  }
+
+  // TODO: Return preview_window as a pointer
+  return NULL;
 }

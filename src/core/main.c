@@ -2,32 +2,42 @@
 #include <flux.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
+#include <string.h>
 
 int main(int argc, char **argv) {
-  FluxWindow window;
+  bool use_repl = false;
+  FILE *script_file = NULL;
 
-  /* FILE *script_file = flux_file_open( */
-  /*     "/home/daviwil/Projects/Code/flux-compose/examples/basic-gfx.fxs",
-   * "r"); */
+  // Check program arguments
+  if (argc > 1) {
+    if (strcmp(argv[1], "--repl") == 0) {
+      use_repl = true;
+    } else {
+      // Treat it as a file path
+      script_file = flux_file_open(argv[1], "r");
+      if (script_file == NULL) {
+        printf("ERROR: Could not load script file: %s\n\n", argv[1]);
+        exit(1);
+      }
+    }
+  } else {
+    printf("\nFlux Compose\n\n  Usage: flux-compose <--repl | path/to/file.fxs>\n\n");
+    exit(0);
+  }
 
-  /* FILE *script_file = flux_file_from_string("(show-preview-window 1280 720)\n"); */
+  if (use_repl) {
+    flux_repl_start_stdin();
+  } else if (script_file != NULL) {
+    // Evaluate the script
+    flux_script_eval(script_file);
 
-  /* if (script_file == NULL) { */
-  /*   printf("Could not load script file!\n"); */
-  /*   exit(1); */
-  /* } */
+    // Wait for the graphics loop to complete
+    flux_graphics_loop_wait();
+  }
 
-  /* flux_repl_start_stdin(); */
-
-  flux_graphics_init();
-  window = flux_graphics_window_create(1280, 720, "Flux Compose");
-  flux_graphics_window_show(window);
-
-  // Start the loop and wait until it finishes
-  flux_graphics_loop_start(window);
-  flux_graphics_loop_wait();
-
-  flux_graphics_window_destroy(window);
+  // TODO: Destroy window properly
+  /* flux_graphics_window_destroy(window); */
   flux_graphics_end();
 
   return 0;
