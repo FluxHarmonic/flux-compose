@@ -3,6 +3,7 @@
 #include <inttypes.h>
 #include <pthread.h>
 #include <stdlib.h>
+#include <math.h>
 
 uint8_t flux_graphics_initialized = 0;
 pthread_t flux_graphics_thread_handle;
@@ -138,9 +139,12 @@ void *flux_graphics_render_loop(void *arg) {
     // Clear the model view matrix
     glLoadIdentity();
 
+    float x = 100 + (sin(glfwGetTime() * 7.f) * 100.f);
+    float y = 100 + (cos(glfwGetTime() * 7.f) * 100.f);
+
     // TODO: Render some stuff
     flux_graphics_draw_color(window, 1.0, 0.0, 0.0, 1.0);
-    flux_graphics_draw_rect(window, 100, 100, 500, 400);
+    flux_graphics_draw_rect(window, x, y, 500, 400);
     flux_graphics_draw_color(window, 0.0, 1.0, 0.0, 0.5);
     flux_graphics_draw_rect(window, 300, 300, 500, 400);
 

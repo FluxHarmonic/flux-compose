@@ -12,7 +12,7 @@ find_package(OpenGL REQUIRED)
 include_directories(lib src)
 
 add_library(flux)
-target_link_libraries(flux Threads::Threads glfw OpenGL::GL)
+target_link_libraries(flux m Threads::Threads glfw OpenGL::GL)
 
 add_executable(flux-compose)
 target_link_libraries(flux-compose flux)
