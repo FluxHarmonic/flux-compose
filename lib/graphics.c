@@ -92,6 +92,9 @@ void *flux_graphics_render_loop(void *arg) {
   // Make the window's OpenGL context current
   glfwMakeContextCurrent(glfwWindow);
 
+  // Set the swap interval to prevent tearing
+  glfwSwapInterval(1);
+
   // Initialize the framebuffer and viewport
   glfwGetFramebufferSize(glfwWindow, &window->width, &window->height);
   glViewport(0, 0, window->width, window->height);
