@@ -18,7 +18,7 @@ int main(int argc, char **argv) {
   /* flux_repl_start_stdin(); */
 
   flux_graphics_init();
-  FluxWindow window = flux_graphics_window_create(1280, 720, "flux compose");
+  FluxWindow window = flux_graphics_window_create(1280, 720, "Flux Compose");
   flux_graphics_window_show(window);
 
   // Start the loop and wait until it finishes
