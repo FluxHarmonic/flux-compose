@@ -77,12 +77,7 @@ void flux_graphics_draw_color(FluxWindow window, float r, float g, float b, floa
 }
 
 void flux_graphics_draw_rect(FluxWindow window, float x, float y, float width, float height) {
-  float sx = x / (float)window->width;
-  float sw = width / (float)window->width;
-  float sy = y / (float)window->height;
-  float sh = height / (float)window->height;
-
-  glRectf(x, y, x + width, x + height);
+  glRectf(x, y, x + width, y + height);
 }
 
 void *flux_graphics_render_loop(void *arg) {
