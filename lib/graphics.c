@@ -1,15 +1,12 @@
 #include <GLFW/glfw3.h>
 #include <flux.h>
 #include <inttypes.h>
+#include <math.h>
 #include <pthread.h>
 #include <stdlib.h>
-#include <math.h>
 
 uint8_t flux_graphics_initialized = 0;
 pthread_t flux_graphics_thread_handle;
-
-// TODO: Don't depend on this forever!
-FluxWindow current_window = NULL;
 
 struct _FluxWindow {
   int width, height;
@@ -20,24 +17,31 @@ void glfw_error_callback(int error, const char *description) {
   flux_log("GLFW error %d: %s\n", error, description);
 }
 
-void flux_graphics_window_size_callback(GLFWwindow *window, int width, int height) {
+void flux_graphics_window_size_callback(GLFWwindow *glfwWindow, int width, int height) {
+  FluxWindow window;
+
   flux_log("Window size changed: %dx%d\n", width, height);
 
-  if (current_window) {
-    current_window->width = width;
-    current_window->height = height;
+  window = glfwGetWindowUserPointer(glfwWindow);
+  if (!window) {
+    flux_log("Missing window user pointer\n");
+    return;
   }
+
+  window->width = width;
+  window->height = height;
 }
 
 FluxWindow flux_graphics_window_create(int width, int height, const char *title) {
   FluxWindow window;
+  GLFWwindow *glfwWindow;
 
   // Make the window float
   glfwWindowHint(GLFW_FLOATING, GLFW_TRUE);
   glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 
   // Create the window
-  GLFWwindow *glfwWindow = glfwCreateWindow(width, height, title, NULL, NULL);
+  glfwWindow = glfwCreateWindow(width, height, title, NULL, NULL);
   if (!glfwWindow) {
     flux_log("Could not create GLFW window!\n");
     return NULL;
@@ -47,7 +51,8 @@ FluxWindow flux_graphics_window_create(int width, int height, const char *title)
   window->glfwWindow = glfwWindow;
   window->width = width;
   window->height = height;
-  current_window = window;
+
+  glfwSetWindowUserPointer(glfwWindow, window);
 
   // Respond to window size changes
   glfwSetWindowSizeCallback(glfwWindow, flux_graphics_window_size_callback);
@@ -84,6 +89,7 @@ void flux_graphics_draw_rect(FluxWindow window, float x, float y, float width, f
 void *flux_graphics_render_loop(void *arg) {
   FluxWindow window = arg;
   GLFWwindow *glfwWindow = window->glfwWindow;
+  float ratio;
 
   // TODO: Is this the best place for this?
   // Register a key callback for input handling
@@ -101,7 +107,7 @@ void *flux_graphics_render_loop(void *arg) {
   glViewport(0, 0, window->width, window->height);
 
   // Set up the orthographic projection for 2D rendering
-  float ratio = window->width / (float)window->height;
+  ratio = window->width / (float)window->height;
   glMatrixMode(GL_PROJECTION);
   glLoadIdentity();
   glOrtho(-ratio, ratio, -1.f, 1.f, 1.f, -1.f);
@@ -116,6 +122,9 @@ void *flux_graphics_render_loop(void *arg) {
   glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
   while (!glfwWindowShouldClose(glfwWindow)) {
+    float x;
+    float y;
+
     // Poll for events for this frame
     glfwPollEvents();
 
@@ -126,7 +135,7 @@ void *flux_graphics_render_loop(void *arg) {
     glViewport(0, 0, window->width, window->height);
 
     // Set up the orthographic projection for 2D rendering
-    float ratio = 16 / (float)9; // window->width / (float)window->height;
+    ratio = 16 / (float)9; // window->width / (float)window->height;
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
     glOrtho(0.f, (float)window->width, (float)window->height, 0.f, -1.f, 1.f);
@@ -139,8 +148,8 @@ void *flux_graphics_render_loop(void *arg) {
     // Clear the model view matrix
     glLoadIdentity();
 
-    float x = 100 + (sin(glfwGetTime() * 7.f) * 100.f);
-    float y = 100 + (cos(glfwGetTime() * 7.f) * 100.f);
+    x = 100 + (sin(glfwGetTime() * 7.f) * 100.f);
+    y = 100 + (cos(glfwGetTime() * 7.f) * 100.f);
 
     // TODO: Render some stuff
     flux_graphics_draw_color(window, 1.0, 0.0, 0.0, 1.0);

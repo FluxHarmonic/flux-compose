@@ -4,6 +4,8 @@
 #include <stdlib.h>
 
 int main(int argc, char **argv) {
+  FluxWindow window;
+
   /* FILE *script_file = flux_file_open( */
   /*     "/home/daviwil/Projects/Code/flux-compose/examples/basic-gfx.fxs",
    * "r"); */
@@ -18,7 +20,7 @@ int main(int argc, char **argv) {
   /* flux_repl_start_stdin(); */
 
   flux_graphics_init();
-  FluxWindow window = flux_graphics_window_create(1280, 720, "Flux Compose");
+  window = flux_graphics_window_create(1280, 720, "Flux Compose");
   flux_graphics_window_show(window);
 
   // Start the loop and wait until it finishes
