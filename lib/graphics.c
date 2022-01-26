@@ -88,6 +88,15 @@ void flux_graphics_draw_color(FluxWindow window, float r, float g, float b, floa
 }
 
 void flux_graphics_draw_rect(FluxWindow window, float x, float y, float width, float height) {
+  glBegin(GL_LINE_LOOP);
+  glVertex2f(x, y);
+  glVertex2f(x + width, y);
+  glVertex2f(x + width, y + height);
+  glVertex2f(x, y + height);
+  glEnd();
+}
+
+void flux_graphics_draw_rect_fill(FluxWindow window, float x, float y, float width, float height) {
   glRectf(x, y, x + width, y + height);
 }
 
@@ -153,14 +162,18 @@ void *flux_graphics_render_loop(void *arg) {
     // Clear the model view matrix
     glLoadIdentity();
 
+    // Draw the preview area rect
+    flux_graphics_draw_color(window, 1.f, 1.f, 0.f, 1.f);
+    flux_graphics_draw_rect(window, 0.01, 0.01, 1280, 720);
+
     x = 100 + (sin(glfwGetTime() * 7.f) * 100.f);
     y = 100 + (cos(glfwGetTime() * 7.f) * 100.f);
 
     // TODO: Render some stuff
     flux_graphics_draw_color(window, 1.0, 0.0, 0.0, 1.0);
-    flux_graphics_draw_rect(window, x, y, 500, 400);
+    flux_graphics_draw_rect_fill(window, x, y, 500, 400);
     flux_graphics_draw_color(window, 0.0, 1.0, 0.0, 0.5);
-    flux_graphics_draw_rect(window, 300, 300, 500, 400);
+    flux_graphics_draw_rect_fill(window, 300, 300, 500, 400);
 
     // Swap the render buffers
     glfwSwapBuffers(glfwWindow);
