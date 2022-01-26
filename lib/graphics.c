@@ -1,15 +1,12 @@
 #include <GLFW/glfw3.h>
 #include <flux.h>
 #include <inttypes.h>
+#include <math.h>
 #include <pthread.h>
 #include <stdlib.h>
-#include <math.h>
 
 uint8_t flux_graphics_initialized = 0;
 pthread_t flux_graphics_thread_handle;
-
-// TODO: Don't depend on this forever!
-FluxWindow current_window = NULL;
 
 struct _FluxWindow {
   int width, height;
@@ -20,13 +17,19 @@ void glfw_error_callback(int error, const char *description) {
   flux_log("GLFW error %d: %s\n", error, description);
 }
 
-void flux_graphics_window_size_callback(GLFWwindow *window, int width, int height) {
+void flux_graphics_window_size_callback(GLFWwindow *glfwWindow, int width, int height) {
+  FluxWindow window;
+
   flux_log("Window size changed: %dx%d\n", width, height);
 
-  if (current_window) {
-    current_window->width = width;
-    current_window->height = height;
+  window = glfwGetWindowUserPointer(glfwWindow);
+  if (!window) {
+    flux_log("Missing window user pointer\n");
+    return;
   }
+
+  window->width = width;
+  window->height = height;
 }
 
 FluxWindow flux_graphics_window_create(int width, int height, const char *title) {
@@ -48,7 +51,8 @@ FluxWindow flux_graphics_window_create(int width, int height, const char *title)
   window->glfwWindow = glfwWindow;
   window->width = width;
   window->height = height;
-  current_window = window;
+
+  glfwSetWindowUserPointer(glfwWindow, window);
 
   // Respond to window size changes
   glfwSetWindowSizeCallback(glfwWindow, flux_graphics_window_size_callback);
