@@ -14,3 +14,7 @@ Here's a list of tasks we've come up with while coding on the project:
 
 https://thebookofshaders.com/ is an excellent resource!
 https://rubendv.be/posts/fwidth/
+
+*** Inspiration
+
+- Pixellated texture backgrounds: https://miro.medium.com/max/2000/1*vFtMk62-qq9T8ItqEjLiYw.jpeg
