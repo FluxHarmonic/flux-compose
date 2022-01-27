@@ -126,4 +126,12 @@ extern ValueHeader *flux_graphics_func_show_preview_window(VectorCursor *list_cu
                                                            ValueCursor *value_cursor);
 extern ValueHeader *flux_graphics_func_circle(VectorCursor *list_cursor, ValueCursor *value_cursor);
 
+// Texture -------------------------------------------
+
+struct _FluxTexture {
+  uint8_t width;
+  uint8_t height;
+  uint32_t texture_id;
+};
+
 #endif

@@ -1,6 +1,6 @@
 #include <GLFW/glfw3.h>
-#include <flux.h>
 #include <flux-internal.h>
+#include <flux.h>
 #include <inttypes.h>
 #include <math.h>
 #include <pthread.h>
@@ -100,8 +100,52 @@ void flux_graphics_draw_rect_fill(FluxWindow window, float x, float y, float wid
   glRectf(x, y, x + width, y + height);
 }
 
+void flux_graphics_draw_texture(FluxWindow window, FluxTexture texture, float x, float y) {
+  // Bind the texture
+  glBindTexture(GL_TEXTURE_2D, texture->texture_id);
+
+  // Render a quad with texture coords
+  glBegin(GL_QUADS);
+
+  glTexCoord2d(0, 0);
+  glVertex2f(x, y);
+
+  glTexCoord2d(1.0, 0);
+  glVertex2f(x + texture->width, y);
+
+  glTexCoord2d(1.0, 1.0);
+  glVertex2f(x + texture->width, y + texture->height);
+
+  glTexCoord2d(0, 1.0);
+  glVertex2f(x, y + texture->height);
+
+  glEnd();
+
+  // Bind the texture
+  glBindTexture(GL_TEXTURE_2D, 0);
+}
+
+void flux_graphics_save_to_png(FluxWindow window, const char *output_file_path) {
+  unsigned char *image_bytes = NULL;
+  /* image_bytes = malloc(sizeof(*image_bytes) * 4 * window->width * window->height); */
+  image_bytes = malloc(sizeof(*image_bytes) * 3 * window->width * window->height);
+
+  // TODO: Switch context to this window
+
+  // Store the screen contents to a byte array
+  glReadPixels(0, 0, window->width, window->height, GL_RGB, GL_UNSIGNED_BYTE, image_bytes);
+
+  // Save image data to a PNG file
+  flux_texture_png_save(output_file_path, image_bytes, window->width, window->height);
+
+  // Clean up the memory
+  free(image_bytes);
+}
+
 void *flux_graphics_render_loop(void *arg) {
+  int has_saved = 0; // TODO: Remove this hack!
   FluxWindow window = arg;
+  FluxTexture logo = NULL;
   GLFWwindow *glfwWindow = window->glfwWindow;
   float ratio;
 
@@ -134,6 +178,12 @@ void *flux_graphics_render_loop(void *arg) {
   // Enable blending
   glEnable(GL_BLEND);
   glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+  // Enable textures
+  glEnable(GL_TEXTURE_2D);
+
+  // TODO: REMOVE THIS
+  logo = flux_texture_png_load("assets/flux_icon.png");
 
   while (!glfwWindowShouldClose(glfwWindow)) {
     float x;
@@ -174,6 +224,17 @@ void *flux_graphics_render_loop(void *arg) {
     flux_graphics_draw_rect_fill(window, x, y, 500, 400);
     flux_graphics_draw_color(window, 0.0, 1.0, 0.0, 0.5);
     flux_graphics_draw_rect_fill(window, 300, 300, 500, 400);
+
+    // Render a texture
+    flux_graphics_draw_color(window, 1.0, 1.0, 1.0, 1.0);
+    flux_graphics_draw_texture(window, logo, 950, 350);
+
+    // Render the screen to a file once
+    // TODO: Remove this!
+    if (has_saved == 0) {
+      flux_graphics_save_to_png(window, "output.png");
+      has_saved = 1;
+    }
 
     // Swap the render buffers
     glfwSwapBuffers(glfwWindow);

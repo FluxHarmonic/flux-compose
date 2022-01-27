@@ -57,6 +57,14 @@ extern void flux_graphics_window_destroy(FluxWindow window);
 extern void flux_graphics_loop_start(FluxWindow window);
 extern void flux_graphics_loop_wait(void);
 
+// Texture ---------------------------------------
+
+typedef struct _FluxTexture *FluxTexture;
+
+extern FluxTexture flux_texture_png_load(char *file_path);
+extern void flux_texture_png_save(const char *file_path, const unsigned char *image_data,
+                                  const uint32_t width, const uint32_t height);
+
 // Scene ------------------------------------------
 
 // Member types

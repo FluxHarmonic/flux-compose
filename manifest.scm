@@ -6,6 +6,7 @@
    "pkg-config"
    "gdb"
    "cmake"
+   "zlib"
 
    ;; Guile
    "guile"
