@@ -18,3 +18,19 @@ https://rubendv.be/posts/fwidth/
 *** Inspiration
 
 - Pixellated texture backgrounds: https://miro.medium.com/max/2000/1*vFtMk62-qq9T8ItqEjLiYw.jpeg
+
+* Milestones
+
+** Render basic video thumbnails from input script files
+
+** Develop algorithms for generating interesting thumbnail styles (and other graphics)
+
+** Create animations that can be rendered to video files, used in stream overlays
+
+** Write basic audio system with a basic audio synthesizer
+
+** Design scripting patterns for writing songs with an audio timeline
+
+** Develop a set of synthesizers and effects that can be used for more interesting music and sound effects
+
+** Integrate video editing capabilities
