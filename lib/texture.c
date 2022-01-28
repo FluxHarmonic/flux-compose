@@ -40,9 +40,9 @@ FluxTexture flux_texture_png_load(char *file_path) {
   }
 
   // TODO: Remove this
-  flux_log("width: %u\nheight: %u\nbit depth: %u\ncolor type: %u\ncomp: %u\n filt: %u\ninter: %u\n",
-           header.width, header.height, header.bit_depth, header.compression_method,
-           header.filter_method, header.interlace_method);
+  /* flux_log("width: %u\nheight: %u\nbit depth: %u\ncolor type: %u\ncomp: %u\n filt: %u\ninter: %u\n", */
+  /*          header.width, header.height, header.bit_depth, header.compression_method, */
+  /*          header.filter_method, header.interlace_method); */
 
   ret = spng_decoded_image_size(ctx, fmt, &image_data_size);
   if (ret) {
@@ -94,8 +94,7 @@ void flux_texture_png_save(const char *file_path, const unsigned char *image_dat
   header.width = width;
   header.height = height;
   header.bit_depth = 8;
-  /* header.color_type = SPNG_COLOR_TYPE_TRUECOLOR_ALPHA; */
-  header.color_type = SPNG_COLOR_TYPE_TRUECOLOR;
+  header.color_type = SPNG_COLOR_TYPE_TRUECOLOR_ALPHA;
 
   spng_set_option(ctx, SPNG_ENCODE_TO_BUFFER, 0);
 
@@ -111,9 +110,7 @@ void flux_texture_png_save(const char *file_path, const unsigned char *image_dat
     flux_log("Error setting PNG output file: %s\n", spng_strerror(ret));
   }
 
-  /* ret = spng_encode_image(ctx, image_data, sizeof(*image_data) * 4 * width * height,
-   * SPNG_FMT_PNG, */
-  ret = spng_encode_image(ctx, image_data, sizeof(*image_data) * 3 * width * height, SPNG_FMT_PNG,
+  ret = spng_encode_image(ctx, image_data, sizeof(*image_data) * 4 * width * height, SPNG_FMT_PNG,
                           SPNG_ENCODE_FINALIZE);
 
   if (ret) {

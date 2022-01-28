@@ -5,6 +5,7 @@
 #include <math.h>
 #include <pthread.h>
 #include <stdlib.h>
+#include <string.h>
 
 uint8_t flux_graphics_initialized = 0;
 pthread_t flux_graphics_thread_handle;
@@ -126,20 +127,33 @@ void flux_graphics_draw_texture(FluxWindow window, FluxTexture texture, float x,
 }
 
 void flux_graphics_save_to_png(FluxWindow window, const char *output_file_path) {
+  int i = 0;
+  unsigned char *screen_bytes = NULL;
   unsigned char *image_bytes = NULL;
-  /* image_bytes = malloc(sizeof(*image_bytes) * 4 * window->width * window->height); */
-  image_bytes = malloc(sizeof(*image_bytes) * 3 * window->width * window->height);
+  size_t image_row_length = 4 * window->width;
+  size_t image_data_size = sizeof(*image_bytes) * image_row_length * window->height;
+
+  // Allocate storage for the screen bytes
+  // TODO: reduce memory allocation requirements
+  screen_bytes = malloc(image_data_size);
+  image_bytes = malloc(image_data_size);
 
   // TODO: Switch context to this window
 
   // Store the screen contents to a byte array
-  glReadPixels(0, 0, window->width, window->height, GL_RGB, GL_UNSIGNED_BYTE, image_bytes);
+  glReadPixels(0, 0, window->width, window->height, GL_RGBA, GL_UNSIGNED_BYTE, screen_bytes);
+
+  // Flip the rows of the byte array because OpenGL's coordinate system is flipped
+  for (i = 0; i < window->height; i++) {
+    memcpy(&image_bytes[image_row_length * i], &screen_bytes[image_row_length * (window->height - (i + 1))], sizeof(*image_bytes) * image_row_length);
+  }
 
   // Save image data to a PNG file
   flux_texture_png_save(output_file_path, image_bytes, window->width, window->height);
 
   // Clean up the memory
   free(image_bytes);
+  free(screen_bytes);
 }
 
 void *flux_graphics_render_loop(void *arg) {
