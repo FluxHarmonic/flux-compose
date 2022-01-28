@@ -101,7 +101,51 @@ void flux_graphics_draw_rect_fill(FluxWindow window, float x, float y, float wid
   glRectf(x, y, x + width, y + height);
 }
 
-void flux_graphics_draw_texture(FluxWindow window, FluxTexture texture, float x, float y) {
+void flux_graphics_draw_args_scale(FluxDrawArgs *args, float scale_x, float scale_y) {
+  if (scale_x != 0 || scale_y != 0) {
+    args->scale_x = scale_x;
+    args->scale_y = scale_y;
+    args->flags |= FluxDrawScaled;
+  }
+}
+
+void flux_graphics_draw_args_rotate(FluxDrawArgs *args, float rotation) {
+  if (rotation != 0.0) {
+    args->rotation = rotation;
+    args->flags |= FluxDrawRotated;
+  }
+}
+
+void flux_graphics_draw_args_center(FluxDrawArgs *args, bool centered) {
+  if (centered) {
+    args->flags |= FluxDrawCentered;
+  }
+}
+
+void flux_graphics_draw_texture_ex(FluxWindow window, FluxTexture texture, float x, float y, FluxDrawArgs *args) {
+  float bx, by;
+
+  // Save current rendering state before transforms
+  glPushMatrix();
+
+  // Calculate the base x and y positions
+  if ((args->flags & FluxDrawCentered) == FluxDrawCentered) {
+    bx = -texture->width / 2.f;
+    by = -texture->height / 2.f;
+  } else {
+    bx = by = 0.f;
+  }
+
+  // Translate and scale as requested
+  // TODO: Do this based on flags?
+  glTranslated(x, y, 0);
+  if ((args->flags & FluxDrawScaled) == FluxDrawScaled) {
+    glScaled(args->scale_x, args->scale_y, 1);
+  }
+  if ((args->flags & FluxDrawRotated) == FluxDrawRotated) {
+    glRotated(args->rotation, 0.0, 0.0, 1.0);
+  }
+
   // Bind the texture
   glBindTexture(GL_TEXTURE_2D, texture->texture_id);
 
@@ -109,21 +153,29 @@ void flux_graphics_draw_texture(FluxWindow window, FluxTexture texture, float x,
   glBegin(GL_QUADS);
 
   glTexCoord2d(0, 0);
-  glVertex2f(x, y);
+  glVertex2f(bx, by);
 
   glTexCoord2d(1.0, 0);
-  glVertex2f(x + texture->width, y);
+  glVertex2f(bx + texture->width, by);
 
   glTexCoord2d(1.0, 1.0);
-  glVertex2f(x + texture->width, y + texture->height);
+  glVertex2f(bx + texture->width, by + texture->height);
 
   glTexCoord2d(0, 1.0);
-  glVertex2f(x, y + texture->height);
+  glVertex2f(bx, by + texture->height);
 
   glEnd();
 
-  // Bind the texture
+  // Clear the trans
+  glPopMatrix();
+
+  // Reset the texture
   glBindTexture(GL_TEXTURE_2D, 0);
+}
+
+void flux_graphics_draw_texture(FluxWindow window, FluxTexture texture, float x, float y) {
+  FluxDrawArgs args;
+  flux_graphics_draw_texture_ex(window, texture, x, y, &args);
 }
 
 void flux_graphics_save_to_png(FluxWindow window, const char *output_file_path) {
@@ -132,6 +184,8 @@ void flux_graphics_save_to_png(FluxWindow window, const char *output_file_path) 
   unsigned char *image_bytes = NULL;
   size_t image_row_length = 4 * window->width;
   size_t image_data_size = sizeof(*image_bytes) * image_row_length * window->height;
+
+  flux_log("Rendering window of size %u / %u to file: %s\n", window->width, window->height, output_file_path);
 
   // Allocate storage for the screen bytes
   // TODO: reduce memory allocation requirements
@@ -158,8 +212,10 @@ void flux_graphics_save_to_png(FluxWindow window, const char *output_file_path) 
 
 void *flux_graphics_render_loop(void *arg) {
   int has_saved = 0; // TODO: Remove this hack!
+  float amt, scale;
   FluxWindow window = arg;
   FluxTexture logo = NULL;
+  FluxDrawArgs draw_args;
   GLFWwindow *glfwWindow = window->glfwWindow;
   float ratio;
 
@@ -239,9 +295,16 @@ void *flux_graphics_render_loop(void *arg) {
     flux_graphics_draw_color(window, 0.0, 1.0, 0.0, 0.5);
     flux_graphics_draw_rect_fill(window, 300, 300, 500, 400);
 
+    // Apply transforms before rendering
+    amt = sin(glfwGetTime() * 5.f);
+    scale = 1.0 + amt * 0.3;
+    flux_graphics_draw_args_scale(&draw_args, scale, scale);
+    flux_graphics_draw_args_rotate(&draw_args, amt * 0.1 * 180);
+    flux_graphics_draw_args_center(&draw_args, true);
+
     // Render a texture
     flux_graphics_draw_color(window, 1.0, 1.0, 1.0, 1.0);
-    flux_graphics_draw_texture(window, logo, 950, 350);
+    flux_graphics_draw_texture_ex(window, logo, 950, 350, &draw_args);
 
     // Render the screen to a file once
     // TODO: Remove this!

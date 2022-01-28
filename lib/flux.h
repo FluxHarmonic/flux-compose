@@ -5,6 +5,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 
 // Memory -----------------------------------------
 
@@ -43,9 +44,30 @@ extern void flux_log(const char *format, ...);
 extern void flux_log_mem(void *ptr, const char *format, ...);
 extern void flux_log_file_set(const char *file_path);
 
+// Texture ---------------------------------------
+
+typedef struct _FluxTexture *FluxTexture;
+
+extern FluxTexture flux_texture_png_load(char *file_path);
+extern void flux_texture_png_save(const char *file_path, const unsigned char *image_data,
+                                  const uint32_t width, const uint32_t height);
+
 // Graphics ---------------------------------------
 
 typedef struct _FluxWindow *FluxWindow;
+
+typedef enum {
+  FluxDrawNone,
+  FluxDrawScaled = 1,
+  FluxDrawRotated = 2,
+  FluxDrawCentered = 4
+} FluxDrawFlags;
+
+typedef struct FluxDrawArgs {
+  float scale_x, scale_y;
+  float rotation;
+  uint8_t flags;
+} FluxDrawArgs;
 
 extern int flux_graphics_init(void);
 extern void flux_graphics_end(void);
@@ -57,13 +79,12 @@ extern void flux_graphics_window_destroy(FluxWindow window);
 extern void flux_graphics_loop_start(FluxWindow window);
 extern void flux_graphics_loop_wait(void);
 
-// Texture ---------------------------------------
+extern void flux_graphics_draw_args_scale(FluxDrawArgs *args, float scale_x, float scale_y);
+extern void flux_graphics_draw_args_rotate(FluxDrawArgs *args, float rotation);
+extern void flux_graphics_draw_args_center(FluxDrawArgs *args, bool centered);
 
-typedef struct _FluxTexture *FluxTexture;
-
-extern FluxTexture flux_texture_png_load(char *file_path);
-extern void flux_texture_png_save(const char *file_path, const unsigned char *image_data,
-                                  const uint32_t width, const uint32_t height);
+extern void flux_graphics_draw_texture(FluxWindow window, FluxTexture texture, float x, float y);
+extern void flux_graphics_draw_texture_ex(FluxWindow window, FluxTexture texture, float x, float y, FluxDrawArgs *args);
 
 // Scene ------------------------------------------
 
