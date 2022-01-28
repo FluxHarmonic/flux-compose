@@ -129,7 +129,7 @@ void flux_graphics_draw_texture_ex(FluxWindow window, FluxTexture texture, float
   glPushMatrix();
 
   // Calculate the base x and y positions
-  if ((args->flags & FluxDrawCentered) == FluxDrawCentered) {
+  if (args && (args->flags & FluxDrawCentered) == FluxDrawCentered) {
     bx = -texture->width / 2.f;
     by = -texture->height / 2.f;
   } else {
@@ -138,10 +138,10 @@ void flux_graphics_draw_texture_ex(FluxWindow window, FluxTexture texture, float
 
   // Translate and scale as requested
   glTranslated(x, y, 0);
-  if ((args->flags & FluxDrawScaled) == FluxDrawScaled) {
+  if (args && (args->flags & FluxDrawScaled) == FluxDrawScaled) {
     glScaled(args->scale_x, args->scale_y, 1);
   }
-  if ((args->flags & FluxDrawRotated) == FluxDrawRotated) {
+  if (args && (args->flags & FluxDrawRotated) == FluxDrawRotated) {
     glRotated(args->rotation, 0.0, 0.0, 1.0);
   }
 
@@ -165,7 +165,7 @@ void flux_graphics_draw_texture_ex(FluxWindow window, FluxTexture texture, float
 
   glEnd();
 
-  // Clear the trans
+  // Clear the transforms
   glPopMatrix();
 
   // Reset the texture
@@ -173,8 +173,7 @@ void flux_graphics_draw_texture_ex(FluxWindow window, FluxTexture texture, float
 }
 
 void flux_graphics_draw_texture(FluxWindow window, FluxTexture texture, float x, float y) {
-  FluxDrawArgs args;
-  flux_graphics_draw_texture_ex(window, texture, x, y, &args);
+  flux_graphics_draw_texture_ex(window, texture, x, y, NULL);
 }
 
 void flux_graphics_save_to_png(FluxWindow window, const char *output_file_path) {
