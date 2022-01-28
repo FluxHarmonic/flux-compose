@@ -137,7 +137,6 @@ void flux_graphics_draw_texture_ex(FluxWindow window, FluxTexture texture, float
   }
 
   // Translate and scale as requested
-  // TODO: Do this based on flags?
   glTranslated(x, y, 0);
   if ((args->flags & FluxDrawScaled) == FluxDrawScaled) {
     glScaled(args->scale_x, args->scale_y, 1);
