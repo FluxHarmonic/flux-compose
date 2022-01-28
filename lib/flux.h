@@ -34,8 +34,8 @@ extern void flux_vector_cursor_init(Vector vector, VectorCursor *cursor);
 
 // File -------------------------------------------
 
-extern FILE *flux_file_open(char *file_name, char *mode_string);
-extern FILE *flux_file_from_string(char *file_contents);
+extern FILE *flux_file_open(const char *file_name, const char *mode_string);
+extern FILE *flux_file_from_string(const char *file_contents);
 
 // Logging ----------------------------------------
 
