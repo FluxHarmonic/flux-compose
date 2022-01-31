@@ -134,4 +134,12 @@ struct _FluxTexture {
   uint32_t texture_id;
 };
 
+// Scene ---------------------------------------------
+
+typedef struct {
+  float center_x, center_y;
+  float scale;
+  // TODO: Add pointer to current scene
+} FluxSceneView;
+
 #endif

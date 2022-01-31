@@ -214,6 +214,7 @@ void *flux_graphics_render_loop(void *arg) {
   FluxWindow window = arg;
   FluxTexture logo = NULL;
   FluxDrawArgs draw_args;
+  FluxSceneView scene_view;
   GLFWwindow *glfwWindow = window->glfwWindow;
   float ratio;
 
@@ -280,9 +281,20 @@ void *flux_graphics_render_loop(void *arg) {
     // Clear the model view matrix
     glLoadIdentity();
 
+    // Set up the scene view
+    scene_view.center_x = window->width / 2.f;
+    scene_view.center_y = window->height / 2.f;
+    scene_view.scale = 1.0f;
+
+    // Translate the scene preview to the appropriate position, factoring in the
+    // scaled size of the scene
+    glPushMatrix();
+    glTranslatef(scene_view.center_x - ((1280 * scene_view.scale) / 2.f), scene_view.center_y - ((720 * scene_view.scale) / 2.f), 0.f);
+    glScalef(scene_view.scale, scene_view.scale, 1.f);
+
     // Draw the preview area rect
     flux_graphics_draw_color(window, 1.f, 1.f, 0.f, 1.f);
-    flux_graphics_draw_rect(window, 0.01, 0.01, 1280, 720);
+    flux_graphics_draw_rect(window, -1.f, -1.f, 1280 + 1.f, 720 + 1.f);
 
     x = 100 + (sin(glfwGetTime() * 7.f) * 100.f);
     y = 100 + (cos(glfwGetTime() * 7.f) * 100.f);
@@ -303,6 +315,9 @@ void *flux_graphics_render_loop(void *arg) {
     // Render a texture
     flux_graphics_draw_color(window, 1.0, 1.0, 1.0, 1.0);
     flux_graphics_draw_texture_ex(window, logo, 950, 350, &draw_args);
+
+    // Finish scene rendering
+    glPopMatrix();
 
     // Render the screen to a file once
     // TODO: Remove this!
