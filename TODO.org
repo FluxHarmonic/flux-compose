@@ -19,6 +19,17 @@ https://rubendv.be/posts/fwidth/
 
 - Pixellated texture backgrounds: https://miro.medium.com/max/2000/1*vFtMk62-qq9T8ItqEjLiYw.jpeg
 
+** TODO Implement dithering algorithms for stylistic use
+
+*** Ordered dithering
+
+- https://en.wikipedia.org/wiki/Ordered_dithering
+- https://web.archive.org/web/20190316064436/http://www.efg2.com/Lab/Library/ImageProcessing/DHALF.TXT
+
+** TODO Implement various easing algorithms
+
+- An excellent resource: https://easings.net
+
 * Milestones
 
 ** Render basic video thumbnails from input script files
