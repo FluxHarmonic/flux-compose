@@ -13,4 +13,5 @@
 
    ;; OpenGL and GLFW
    "mesa"
-   "glfw"))
+   "glfw"
+   "freetype"))
