@@ -122,7 +122,8 @@ void flux_graphics_draw_args_center(FluxDrawArgs *args, bool centered) {
   }
 }
 
-void flux_graphics_draw_texture_ex(FluxWindow window, FluxTexture texture, float x, float y, FluxDrawArgs *args) {
+void flux_graphics_draw_texture_ex(FluxWindow window, FluxTexture texture, float x, float y,
+                                   FluxDrawArgs *args) {
   float bx, by;
 
   // Save current rendering state before transforms
@@ -183,7 +184,8 @@ void flux_graphics_save_to_png(FluxWindow window, const char *output_file_path) 
   size_t image_row_length = 4 * window->width;
   size_t image_data_size = sizeof(*image_bytes) * image_row_length * window->height;
 
-  flux_log("Rendering window of size %u / %u to file: %s\n", window->width, window->height, output_file_path);
+  flux_log("Rendering window of size %u / %u to file: %s\n", window->width, window->height,
+           output_file_path);
 
   // Allocate storage for the screen bytes
   // TODO: reduce memory allocation requirements
@@ -197,7 +199,9 @@ void flux_graphics_save_to_png(FluxWindow window, const char *output_file_path) 
 
   // Flip the rows of the byte array because OpenGL's coordinate system is flipped
   for (i = 0; i < window->height; i++) {
-    memcpy(&image_bytes[image_row_length * i], &screen_bytes[image_row_length * (window->height - (i + 1))], sizeof(*image_bytes) * image_row_length);
+    memcpy(&image_bytes[image_row_length * i],
+           &screen_bytes[image_row_length * (window->height - (i + 1))],
+           sizeof(*image_bytes) * image_row_length);
   }
 
   // Save image data to a PNG file
@@ -215,6 +219,7 @@ void *flux_graphics_render_loop(void *arg) {
   FluxTexture logo = NULL;
   FluxDrawArgs draw_args;
   FluxSceneView scene_view;
+  FluxFont jost_font = NULL;
   GLFWwindow *glfwWindow = window->glfwWindow;
   float ratio;
 
@@ -239,6 +244,11 @@ void *flux_graphics_render_loop(void *arg) {
   glLoadIdentity();
   glOrtho(-ratio, ratio, -1.f, 1.f, 1.f, -1.f);
   glMatrixMode(GL_MODELVIEW);
+
+  // Load a font
+  jost_font = flux_font_load_file("/gnu/store/1mba63xmanh974yag9g3fh5ilnf7y4jm-font-jost-3.5/share/"
+                                  "fonts/truetype/Jost-500-Medium.ttf",
+                                  200);
 
   // TODO: Should I add scene flipping back here as an event to be handled?
   /* flux_log("Received set scene event!\n"); */
@@ -284,12 +294,13 @@ void *flux_graphics_render_loop(void *arg) {
     // Set up the scene view
     scene_view.center_x = window->width / 2.f;
     scene_view.center_y = window->height / 2.f;
-    scene_view.scale = 1.0f;
+    scene_view.scale = 1.5f;
 
     // Translate the scene preview to the appropriate position, factoring in the
     // scaled size of the scene
     glPushMatrix();
-    glTranslatef(scene_view.center_x - ((1280 * scene_view.scale) / 2.f), scene_view.center_y - ((720 * scene_view.scale) / 2.f), 0.f);
+    glTranslatef(scene_view.center_x - ((1280 * scene_view.scale) / 2.f),
+                 scene_view.center_y - ((720 * scene_view.scale) / 2.f), 0.f);
     glScalef(scene_view.scale, scene_view.scale, 1.f);
 
     // Draw the preview area rect
@@ -315,6 +326,11 @@ void *flux_graphics_render_loop(void *arg) {
     // Render a texture
     flux_graphics_draw_color(window, 1.0, 1.0, 1.0, 1.0);
     flux_graphics_draw_texture_ex(window, logo, 950, 350, &draw_args);
+
+    // Draw some text if the font got loaded
+    if (jost_font) {
+      flux_font_draw_text(jost_font, "Flux Harmonic", 20, 20);
+    }
 
     // Finish scene rendering
     glPopMatrix();

@@ -2,10 +2,10 @@
 #define __FLUX_H
 
 #include <inttypes.h>
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdbool.h>
 
 // Memory -----------------------------------------
 
@@ -52,6 +52,13 @@ extern FluxTexture flux_texture_png_load(char *file_path);
 extern void flux_texture_png_save(const char *file_path, const unsigned char *image_data,
                                   const uint32_t width, const uint32_t height);
 
+// Fonts -----------------------------------------
+
+typedef struct _FluxFont *FluxFont;
+
+extern FluxFont flux_font_load_file(const char *font_path, uint8_t font_size);
+extern void flux_font_draw_text(FluxFont font, const char *text, float pos_x, float pos_y);
+
 // Graphics ---------------------------------------
 
 typedef struct _FluxWindow *FluxWindow;
@@ -84,7 +91,8 @@ extern void flux_graphics_draw_args_rotate(FluxDrawArgs *args, float rotation);
 extern void flux_graphics_draw_args_center(FluxDrawArgs *args, bool centered);
 
 extern void flux_graphics_draw_texture(FluxWindow window, FluxTexture texture, float x, float y);
-extern void flux_graphics_draw_texture_ex(FluxWindow window, FluxTexture texture, float x, float y, FluxDrawArgs *args);
+extern void flux_graphics_draw_texture_ex(FluxWindow window, FluxTexture texture, float x, float y,
+                                          FluxDrawArgs *args);
 
 // Scene ------------------------------------------
 
