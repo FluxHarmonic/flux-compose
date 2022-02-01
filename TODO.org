@@ -25,6 +25,7 @@ https://rubendv.be/posts/fwidth/
 
 - https://en.wikipedia.org/wiki/Ordered_dithering
 - https://web.archive.org/web/20190316064436/http://www.efg2.com/Lab/Library/ImageProcessing/DHALF.TXT
+- Blue noise dithering: http://momentsingraphics.de/BlueNoise.html
 
 ** TODO Implement various easing algorithms
 
