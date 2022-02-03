@@ -11,10 +11,10 @@ find_package(OpenGL REQUIRED)
 find_package(ZLIB REQUIRED)
 find_package(Freetype REQUIRED)
 
-include_directories(lib src lib/vendor/spng lib/vendor/miniz)
+include_directories(lib src lib/vendor/spng lib/vendor/miniz lib/vendor/glad/include lib/vendor/cglm)
 
 add_library(flux)
-target_link_libraries(flux m z ${FREETYPE_LIBRARIES} Threads::Threads glfw OpenGL::GL)
+target_link_libraries(flux m z ${FREETYPE_LIBRARIES} Threads::Threads glfw OpenGL::GL ${CMAKE_DL_LIBS})
 target_include_directories(flux PRIVATE ${FREETYPE_INCLUDE_DIRS})
 
 add_executable(flux-compose)

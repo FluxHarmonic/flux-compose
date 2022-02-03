@@ -62,6 +62,7 @@ extern void flux_font_draw_text(FluxFont font, const char *text, float pos_x, fl
 // Graphics ---------------------------------------
 
 typedef struct _FluxWindow *FluxWindow;
+typedef struct _FluxRenderContext *FluxRenderContext;
 
 typedef enum {
   FluxDrawNone,
@@ -90,8 +91,8 @@ extern void flux_graphics_draw_args_scale(FluxDrawArgs *args, float scale_x, flo
 extern void flux_graphics_draw_args_rotate(FluxDrawArgs *args, float rotation);
 extern void flux_graphics_draw_args_center(FluxDrawArgs *args, bool centered);
 
-extern void flux_graphics_draw_texture(FluxWindow window, FluxTexture texture, float x, float y);
-extern void flux_graphics_draw_texture_ex(FluxWindow window, FluxTexture texture, float x, float y,
+extern void flux_graphics_draw_texture(FluxRenderContext context, FluxTexture texture, float x, float y);
+extern void flux_graphics_draw_texture_ex(FluxRenderContext context, FluxTexture texture, float x, float y,
                                           FluxDrawArgs *args);
 
 // Scene ------------------------------------------

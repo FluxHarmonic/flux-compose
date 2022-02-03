@@ -1,3 +1,4 @@
+#include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <flux-internal.h>
 #include <flux.h>
@@ -6,14 +7,81 @@
 #include <pthread.h>
 #include <stdlib.h>
 #include <string.h>
+#include <cglm/cglm.h>
+
+// model: affecting the shape and translation of the object
+// view: affecting the position of the camera, possibly scale (make camera lens bigger/smaller)
+// projection: projecting to screen coordinates
+
+const char *DefaultVertexShaderText = GLSL(
+  layout (location = 0) in vec2 a_vec;
+
+  uniform mat4 model;
+  uniform mat4 view;
+  uniform mat4 projection;
+
+  void main()
+  {
+    gl_Position = projection * view * model * vec4(a_vec, 0.0, 1.0);
+  }
+);
+
+const char *DefaultFragmentShaderText = GLSL(
+  uniform vec4 color = vec4(1.0, 1.0, 1.0, 1.0);
+  void main()
+  {
+    gl_FragColor = color;
+  }
+);
+
+const char *TexturedVertexShaderText = GLSL(
+  layout (location = 0) in vec2 position;
+  layout (location = 1) in vec2 tex_uv;
+
+  uniform mat4 model;
+  uniform mat4 view;
+  uniform mat4 projection;
+
+  out vec2 tex_coords;
+
+  void main()
+  {
+    tex_coords = tex_uv;
+    gl_Position = projection * view * model * vec4(position, 0.0, 1.0);
+  }
+);
+
+const char *TexturedFragmentShaderText = GLSL(
+  in vec2 tex_coords;
+
+  uniform sampler2D tex0;
+  uniform vec4 color = vec4(1.0, 1.0, 1.0, 1.0);
+
+  void main()
+  {
+    gl_FragColor = texture(tex0, tex_coords) * color;
+  }
+);
 
 uint8_t flux_graphics_initialized = 0;
 pthread_t flux_graphics_thread_handle;
 
+struct _FluxRenderContext {
+  vec2 screen_size;
+  mat4 screen_matrix;
+  mat4 view_matrix;
+};
+
 struct _FluxWindow {
-  int width, height;
+  float *width, *height;
+  struct _FluxRenderContext context;
   GLFWwindow *glfwWindow;
 };
+
+typedef struct {
+  GLenum shader_type;
+  const char *shader_text;
+} FluxShaderFile;
 
 // TODO: Eventually store this in the scripting layer memory
 FluxWindow preview_window;
@@ -22,19 +90,32 @@ void glfw_error_callback(int error, const char *description) {
   flux_log("GLFW error %d: %s\n", error, description);
 }
 
+void flux_graphics_window_size_update(FluxWindow window, int width, int height) {
+  // Get the current framebuffer size
+  glfwGetFramebufferSize(window->glfwWindow, &width, &height);
+
+  *window->width = width;
+  *window->height = height;
+
+  // Update the viewport and recalculate projection matrix
+  glViewport(0, 0, width, height);
+  glm_ortho(0.f, *window->width, *window->height, 0.f, -1.f, 1.f, window->context.screen_matrix);
+}
+
 void flux_graphics_window_size_callback(GLFWwindow *glfwWindow, int width, int height) {
   FluxWindow window;
 
   flux_log("Window size changed: %dx%d\n", width, height);
 
   window = glfwGetWindowUserPointer(glfwWindow);
+
   if (!window) {
     flux_log("Cannot get FluxWindow from GLFWwindow!\n");
     return;
   }
 
-  window->width = width;
-  window->height = height;
+  // Update the screen size and projection matrix
+  flux_graphics_window_size_update(window, width, height);
 }
 
 FluxWindow flux_graphics_window_create(int width, int height, const char *title) {
@@ -54,8 +135,10 @@ FluxWindow flux_graphics_window_create(int width, int height, const char *title)
 
   window = malloc(sizeof(struct _FluxWindow));
   window->glfwWindow = glfwWindow;
-  window->width = width;
-  window->height = height;
+  window->width = &window->context.screen_size[0];
+  window->height = &window->context.screen_size[1];
+  *window->width = width;
+  *window->height = width;
 
   // Set the "user pointer" of the GLFW window to our window
   glfwSetWindowUserPointer(glfwWindow, window);
@@ -84,21 +167,109 @@ void flux_graphics_render_loop_key_callback(GLFWwindow *window, int key, int sca
                                             int mods) {
 }
 
-void flux_graphics_draw_color(FluxWindow window, float r, float g, float b, float a) {
-  glColor4f(r, g, b, a);
+GLuint flux_graphics_shader_compile(const FluxShaderFile *shader_files, uint32_t shader_count) {
+  GLuint shader_id = 0;
+  GLuint shader_program;
+  shader_program = glCreateProgram();
+
+  // Compile the shader files
+  for (GLuint i = 0; i < shader_count; i++) {
+    shader_id = glCreateShader(shader_files[i].shader_type);
+    glShaderSource(shader_id, 1, &shader_files[i].shader_text, NULL);
+    glCompileShader(shader_id);
+
+    int  success = 0;
+    char infoLog[512];
+    glGetShaderiv(shader_id, GL_COMPILE_STATUS, &success);
+    if (success == GL_FALSE) {
+      glGetShaderInfoLog(shader_id, 512, NULL, infoLog);
+      PANIC("Shader compilation failed:\n%s\n", infoLog);
+    }
+
+    glAttachShader(shader_program, shader_id);
+  }
+
+  // Link the full program
+  glLinkProgram(shader_program);
+
+  return shader_program;
+}
+
+void flux_graphics_shader_mat4_set(uint shader_program_id, const char* uniform_name, mat4 matrix) {
+  unsigned int uniformLoc = glGetUniformLocation(shader_program_id, uniform_name);
+  if (uniformLoc == -1) {
+    PANIC("Could not find shader matrix parameter: %s\n", uniform_name);
+  }
+
+  glUniformMatrix4fv(uniformLoc, 1, GL_FALSE, matrix[0]);
 }
 
 void flux_graphics_draw_rect(FluxWindow window, float x, float y, float width, float height) {
-  glBegin(GL_LINE_LOOP);
-  glVertex2f(x, y);
-  glVertex2f(x + width, y);
-  glVertex2f(x + width, y + height);
-  glVertex2f(x, y + height);
-  glEnd();
+  // TODO: This needs a fragment shader to render correctly
 }
 
-void flux_graphics_draw_rect_fill(FluxWindow window, float x, float y, float width, float height) {
-  glRectf(x, y, x + width, y + height);
+void flux_graphics_draw_rect_fill(FluxRenderContext context, float x, float y, float w, float h, vec4 color) {
+  static GLuint shader_program = 0;
+  static GLuint rect_vertex_array  = 0;
+  static GLuint rect_vertex_buffer = 0;
+  static GLuint rect_element_buffer = 0;
+
+  if (shader_program == 0) {
+    const FluxShaderFile shader_files[] = {
+        { GL_VERTEX_SHADER, DefaultVertexShaderText },
+        { GL_FRAGMENT_SHADER, DefaultFragmentShaderText },
+    };
+    shader_program = flux_graphics_shader_compile(shader_files, 2);
+  }
+
+  // Use the shader
+  glUseProgram(shader_program);
+
+  if (rect_vertex_array == 0) {
+    glGenVertexArrays(1, &rect_vertex_array);
+    glGenBuffers(1, &rect_vertex_buffer);
+    glGenBuffers(1, &rect_element_buffer);
+
+    float vertices[] = {
+      // Positions
+      0.5f,  0.5f,   // top right
+      0.5f, -0.5f,   // bottom right
+      -0.5f, -0.5f,   // bottom left
+      -0.5f,  0.5f,   // top left
+    };
+
+    unsigned int indices[] = {
+      0, 1, 2, // first triangle
+      2, 3, 0  // second triangle
+    };
+
+    glBindVertexArray(rect_vertex_array);
+
+    glBindBuffer(GL_ARRAY_BUFFER, rect_vertex_buffer);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, rect_element_buffer);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), 0);
+    glEnableVertexAttribArray(0);
+  } else {
+    glBindVertexArray(rect_vertex_array);
+  }
+
+  // Model matrix is scaled to size and translated
+  mat4 model;
+  glm_translate_make(model, (vec3){ x + (w / 2.f), y + (h / 2.f), 0.f });
+  glm_scale(model, (vec3){ w, h, 0.f });
+
+  // Set the uniforms
+  glUniformMatrix4fv(glGetUniformLocation(shader_program, "projection"), 1, GL_FALSE, (float *)context->screen_matrix);
+  glUniformMatrix4fv(glGetUniformLocation(shader_program, "view"), 1, GL_FALSE, (float *)context->view_matrix);
+  glUniformMatrix4fv(glGetUniformLocation(shader_program, "model"), 1, GL_FALSE, (float *)model);
+  glUniform4fv(glGetUniformLocation(shader_program, "color"), 1, (float *)color);
+
+  // Draw all 6 indices in the element buffer
+  glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 }
 
 void flux_graphics_draw_args_scale(FluxDrawArgs *args, float scale_x, float scale_y) {
@@ -122,69 +293,114 @@ void flux_graphics_draw_args_center(FluxDrawArgs *args, bool centered) {
   }
 }
 
-void flux_graphics_draw_texture_ex(FluxWindow window, FluxTexture texture, float x, float y,
+void flux_graphics_draw_texture_ex(FluxRenderContext context, FluxTexture texture, float x, float y,
                                    FluxDrawArgs *args) {
   float bx, by;
+  static GLuint shader_program = 0;
+  static GLuint rect_vertex_array  = 0;
+  static GLuint rect_vertex_buffer = 0;
+  static GLuint rect_element_buffer = 0;
 
-  // Save current rendering state before transforms
-  glPushMatrix();
-
-  // Calculate the base x and y positions
-  if (args && (args->flags & FluxDrawCentered) == FluxDrawCentered) {
-    bx = -texture->width / 2.f;
-    by = -texture->height / 2.f;
-  } else {
-    bx = by = 0.f;
+  if (shader_program == 0) {
+    const FluxShaderFile shader_files[] = {
+        { GL_VERTEX_SHADER, TexturedVertexShaderText },
+        { GL_FRAGMENT_SHADER, TexturedFragmentShaderText },
+    };
+    shader_program = flux_graphics_shader_compile(shader_files, 2);
   }
 
-  // Translate and scale as requested
-  glTranslated(x, y, 0);
+  // Use the shader
+  glUseProgram(shader_program);
+
+  if (rect_vertex_array == 0) {
+    glGenVertexArrays(1, &rect_vertex_array);
+    glGenBuffers(1, &rect_vertex_buffer);
+    glGenBuffers(1, &rect_element_buffer);
+
+    // Texture coordinates are 0,0 for bottom left and 1,1 for top right
+    float vertices[] = {
+      // Positions   // Texture
+       0.5f,  0.5f,  1.f, 1.f, // top right
+       0.5f, -0.5f,  1.f, 0.f, // bottom right
+      -0.5f, -0.5f,  0.f, 0.f, // bottom left
+      -0.5f,  0.5f,  0.f, 1.f, // top left
+    };
+
+    unsigned int indices[] = {
+      0, 1, 2, // first triangle
+      2, 3, 0  // second triangle
+    };
+
+    glBindVertexArray(rect_vertex_array);
+
+    glBindBuffer(GL_ARRAY_BUFFER, rect_vertex_buffer);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, rect_element_buffer);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), 0);
+
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (2 * sizeof(float)));
+  } else {
+    glBindVertexArray(rect_vertex_array);
+  }
+
+  // Adjust position if texture shouldn't be drawn centered
+  if (args && (args->flags & FluxDrawCentered) == 0) {
+    x += texture->width / 2.f;
+    y += texture->height / 2.f;
+  }
+
+  // Model matrix is scaled to size and translated
+  mat4 model;
+  glm_translate_make(model, (vec3){ x, y, 0.f });
+  glm_scale(model, (vec3){ texture->width, texture->height, 0.f });
+
+  // Rotate and scale as requested
   if (args && (args->flags & FluxDrawScaled) == FluxDrawScaled) {
-    glScaled(args->scale_x, args->scale_y, 1);
+    glm_scale(model, (vec3){ args->scale_x, args->scale_y, 0.f });
   }
   if (args && (args->flags & FluxDrawRotated) == FluxDrawRotated) {
-    glRotated(args->rotation, 0.0, 0.0, 1.0);
+    glm_rotate(model, glm_rad(args->rotation), (vec3) { 0.f, 0.f, 1.f});
   }
 
+  mat4 view;
+  glm_mat4_identity(view);
+
+  // Set the uniforms
+  vec4 color = { 1.f, 1.f, 1.f, 1.f };
+  glUniformMatrix4fv(glGetUniformLocation(shader_program, "projection"), 1, GL_FALSE, (float *)context->screen_matrix);
+  glUniformMatrix4fv(glGetUniformLocation(shader_program, "view"), 1, GL_FALSE, (float *)context->view_matrix);
+  glUniformMatrix4fv(glGetUniformLocation(shader_program, "model"), 1, GL_FALSE, (float *)model);
+  glUniform4fv(glGetUniformLocation(shader_program, "color"), 1, (float *)color);
+
   // Bind the texture
+  glActiveTexture(GL_TEXTURE0);
   glBindTexture(GL_TEXTURE_2D, texture->texture_id);
+  glUniform1i(glGetUniformLocation(shader_program, "tex0"), 0);
 
-  // Render a quad with texture coords
-  glBegin(GL_QUADS);
-
-  glTexCoord2d(0, 0);
-  glVertex2f(bx, by);
-
-  glTexCoord2d(1.0, 0);
-  glVertex2f(bx + texture->width, by);
-
-  glTexCoord2d(1.0, 1.0);
-  glVertex2f(bx + texture->width, by + texture->height);
-
-  glTexCoord2d(0, 1.0);
-  glVertex2f(bx, by + texture->height);
-
-  glEnd();
-
-  // Clear the transforms
-  glPopMatrix();
+  // Draw all 6 indices in the element buffer
+  glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 
   // Reset the texture
   glBindTexture(GL_TEXTURE_2D, 0);
 }
 
-void flux_graphics_draw_texture(FluxWindow window, FluxTexture texture, float x, float y) {
-  flux_graphics_draw_texture_ex(window, texture, x, y, NULL);
+void flux_graphics_draw_texture(FluxRenderContext context, FluxTexture texture, float x, float y) {
+  flux_graphics_draw_texture_ex(context, texture, x, y, NULL);
 }
 
 void flux_graphics_save_to_png(FluxWindow window, const char *output_file_path) {
   int i = 0;
   unsigned char *screen_bytes = NULL;
   unsigned char *image_bytes = NULL;
-  size_t image_row_length = 4 * window->width;
-  size_t image_data_size = sizeof(*image_bytes) * image_row_length * window->height;
+  size_t image_row_length = 4 * *window->width;
+  size_t image_data_size = sizeof(*image_bytes) * image_row_length * *window->height;
 
-  flux_log("Rendering window of size %u / %u to file: %s\n", window->width, window->height,
+  flux_log("Rendering window of size %u / %u to file: %s\n", *window->width, *window->height,
            output_file_path);
 
   // Allocate storage for the screen bytes
@@ -195,17 +411,17 @@ void flux_graphics_save_to_png(FluxWindow window, const char *output_file_path) 
   // TODO: Switch context to this window
 
   // Store the screen contents to a byte array
-  glReadPixels(0, 0, window->width, window->height, GL_RGBA, GL_UNSIGNED_BYTE, screen_bytes);
+  glReadPixels(0, 0, *window->width, *window->height, GL_RGBA, GL_UNSIGNED_BYTE, screen_bytes);
 
   // Flip the rows of the byte array because OpenGL's coordinate system is flipped
-  for (i = 0; i < window->height; i++) {
+  for (i = 0; i < *window->height; i++) {
     memcpy(&image_bytes[image_row_length * i],
-           &screen_bytes[image_row_length * (window->height - (i + 1))],
+           &screen_bytes[image_row_length * ((int)*window->height - (i + 1))],
            sizeof(*image_bytes) * image_row_length);
   }
 
   // Save image data to a PNG file
-  flux_texture_png_save(output_file_path, image_bytes, window->width, window->height);
+  flux_texture_png_save(output_file_path, image_bytes, *window->width, *window->height);
 
   // Clean up the memory
   free(image_bytes);
@@ -218,32 +434,31 @@ void *flux_graphics_render_loop(void *arg) {
   FluxWindow window = arg;
   FluxTexture logo = NULL;
   FluxDrawArgs draw_args;
-  FluxSceneView scene_view;
   FluxFont jost_font = NULL;
+  FluxRenderContext context = &window->context;
   GLFWwindow *glfwWindow = window->glfwWindow;
-  float ratio;
+
+  // Make the window's context current before loading OpenGL DLLs
+  glfwMakeContextCurrent(glfwWindow);
+
+  // Bind to OpenGL functions
+  if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
+  {
+    PANIC("Failed to initialize GLAD!");
+    return NULL;
+  }
+
+  flux_log("OpenGL Version %d.%d loaded\n", GLVersion.major, GLVersion.minor);
 
   // TODO: Is this the best place for this?
   // Register a key callback for input handling
   /* glfwSetKeyCallback(window, key_callback); */
 
-  // TODO: This may need to go somewhere else
-  // Make the window's OpenGL context current
-  glfwMakeContextCurrent(glfwWindow);
+  // Initialize the viewport
+  flux_graphics_window_size_update(window, *window->width, *window->height);
 
   // Set the swap interval to prevent tearing
   glfwSwapInterval(1);
-
-  // Initialize the framebuffer and viewport
-  glfwGetFramebufferSize(glfwWindow, &window->width, &window->height);
-  glViewport(0, 0, window->width, window->height);
-
-  // Set up the orthographic projection for 2D rendering
-  ratio = window->width / (float)window->height;
-  glMatrixMode(GL_PROJECTION);
-  glLoadIdentity();
-  glOrtho(-ratio, ratio, -1.f, 1.f, 1.f, -1.f);
-  glMatrixMode(GL_MODELVIEW);
 
   // Load a font
   jost_font = flux_font_load_file("/gnu/store/1mba63xmanh974yag9g3fh5ilnf7y4jm-font-jost-3.5/share/"
@@ -271,69 +486,40 @@ void *flux_graphics_render_loop(void *arg) {
     // Poll for events for this frame
     glfwPollEvents();
 
-    // TODO: Deduplicate viewport management!
-
-    // Initialize the framebuffer and viewport
-    glfwGetFramebufferSize(glfwWindow, &window->width, &window->height);
-    glViewport(0, 0, window->width, window->height);
-
-    // Set up the orthographic projection for 2D rendering
-    ratio = 16 / (float)9; // window->width / (float)window->height;
-    glMatrixMode(GL_PROJECTION);
-    glLoadIdentity();
-    glOrtho(0.f, (float)window->width, (float)window->height, 0.f, -1.f, 1.f);
-    glMatrixMode(GL_MODELVIEW);
-
     // Clear the screen
-    glClearColor(0.0, 0.0, 0.0, 1.0);
+    glClearColor(0.0, 0.0, 0.0, 0.0);
     glClear(GL_COLOR_BUFFER_BIT);
-
-    // Clear the model view matrix
-    glLoadIdentity();
-
-    // Set up the scene view
-    scene_view.center_x = window->width / 2.f;
-    scene_view.center_y = window->height / 2.f;
-    scene_view.scale = 1.5f;
 
     // Translate the scene preview to the appropriate position, factoring in the
     // scaled size of the scene
-    glPushMatrix();
-    glTranslatef(scene_view.center_x - ((1280 * scene_view.scale) / 2.f),
-                 scene_view.center_y - ((720 * scene_view.scale) / 2.f), 0.f);
-    glScalef(scene_view.scale, scene_view.scale, 1.f);
+    scale = 1.f;
+    glm_mat4_identity(context->view_matrix);
+    glm_translate(context->view_matrix, (vec3) { (*window->width / 2) - (1280 / 2.f), (*window->height / 2) - (720 / 2.f), 0.f });
+    glm_scale(context->view_matrix, (vec3) { scale, scale, 1.f });
 
     // Draw the preview area rect
-    flux_graphics_draw_color(window, 1.f, 1.f, 0.f, 1.f);
-    flux_graphics_draw_rect(window, -1.f, -1.f, 1280 + 1.f, 720 + 1.f);
+    /* flux_graphics_draw_rect_fill(context, -1.f, -1.f, 1280 + 1.f, 720 + 1.f, (vec4) { 1.0, 1.0, 0.0, 1.0 }); */
 
     x = 100 + (sin(glfwGetTime() * 7.f) * 100.f);
     y = 100 + (cos(glfwGetTime() * 7.f) * 100.f);
 
     // TODO: Render some stuff
-    flux_graphics_draw_color(window, 1.0, 0.0, 0.0, 1.0);
-    flux_graphics_draw_rect_fill(window, x, y, 500, 400);
-    flux_graphics_draw_color(window, 0.0, 1.0, 0.0, 0.5);
-    flux_graphics_draw_rect_fill(window, 300, 300, 500, 400);
+    flux_graphics_draw_rect_fill(context, x, y, 500, 400, (vec4) { 1.0, 0.0, 0.0, 1.0 });
+    flux_graphics_draw_rect_fill(context, 300, 300, 500, 400, (vec4){ 0.f, 1.f, 0.f, 0.5f });
 
     // Apply transforms before rendering
     amt = sin(glfwGetTime() * 5.f);
     scale = 1.0 + amt * 0.3;
     flux_graphics_draw_args_scale(&draw_args, scale, scale);
     flux_graphics_draw_args_rotate(&draw_args, amt * 0.1 * 180);
-    flux_graphics_draw_args_center(&draw_args, true);
 
     // Render a texture
-    flux_graphics_draw_color(window, 1.0, 1.0, 1.0, 1.0);
-    flux_graphics_draw_texture_ex(window, logo, 950, 350, &draw_args);
+    flux_graphics_draw_texture_ex(context, logo, 950, 350, &draw_args);
 
     // Draw some text if the font got loaded
     if (jost_font) {
-      flux_font_draw_text(jost_font, "Flux Harmonic", 20, 20);
+      /* flux_font_draw_text(jost_font, "Flux Harmonic", 20, 20); */
     }
-
-    // Finish scene rendering
-    glPopMatrix();
 
     // Render the screen to a file once
     // TODO: Remove this!
@@ -374,6 +560,17 @@ int flux_graphics_init() {
       flux_log("GLFW failed to init!\n");
       return 1;
     }
+
+    // Set OpenGL version and profile
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 5);
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+    glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
+
+#ifdef __APPLE__
+    // Just in case...
+    glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
+#endif
 
     // Make sure all new windows are hidden by default
     glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);

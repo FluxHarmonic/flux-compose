@@ -58,12 +58,13 @@ FluxTexture flux_texture_png_load(char *file_path) {
   }
 
   // Create the texture in video memory
+  // TODO: Add options for smoothing and mipmaps here
   glGenTextures(1, &texture_id);
   glBindTexture(GL_TEXTURE_2D, texture_id);
   glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER,
                   GL_NEAREST); // GL_NEAREST = no smoothing
   glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-  glTexImage2D(GL_TEXTURE_2D, 0, 4, header.width, header.height, 0, GL_RGBA, GL_UNSIGNED_BYTE,
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, header.width, header.height, 0, GL_RGBA, GL_UNSIGNED_BYTE,
                image_bytes);
 
   // Unbind the current texture to unblock future renders

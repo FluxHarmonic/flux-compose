@@ -71,7 +71,7 @@ FluxFont flux_font_load_file(const char *font_path, uint8_t font_size) {
     current_char->bearing_x = face->glyph->bitmap_left;
     current_char->bearing_y = face->glyph->bitmap_top;
 
-    flux_log("Glyph size is: %d / %d\n", current_char->size_x, current_char->size_y);
+    /* flux_log("Glyph size is: %d / %d\n", current_char->size_x, current_char->size_y); */
 
     // Create the texture and copy the glyph bitmap into it
     glGenTextures(1, &current_char->texture_id);
@@ -104,25 +104,25 @@ void flux_font_draw_text(FluxFont font, const char *text, float pos_x, float pos
   for (i = 0; i < num_chars; i++) {
     // Get the char information
     current_char = font->chars + (text[i] - ASCII_CHAR_START);
-    flux_log("%d / %d\n", current_char->size_x, current_char->size_y);
+    /* flux_log("%d / %d\n", current_char->size_x, current_char->size_y); */
 
-    glBindTexture(GL_TEXTURE_2D, current_char->texture_id);
+    /* glBindTexture(GL_TEXTURE_2D, current_char->texture_id); */
 
-    glBegin(GL_QUADS);
+    /* glBegin(GL_QUADS); */
 
-    glTexCoord2d(0, 0);
-    glVertex2f(pos_x, pos_y);
+    /* glTexCoord2d(0, 0); */
+    /* glVertex2f(pos_x, pos_y); */
 
-    glTexCoord2d(1.0, 0);
-    glVertex2f(pos_x + current_char->size_x, pos_y);
+    /* glTexCoord2d(1.0, 0); */
+    /* glVertex2f(pos_x + current_char->size_x, pos_y); */
 
-    glTexCoord2d(1.0, 1.0);
-    glVertex2f(pos_x + current_char->size_x, pos_y + current_char->size_y);
+    /* glTexCoord2d(1.0, 1.0); */
+    /* glVertex2f(pos_x + current_char->size_x, pos_y + current_char->size_y); */
 
-    glTexCoord2d(0, 1.0);
-    glVertex2f(pos_x, pos_y + current_char->size_y);
+    /* glTexCoord2d(0, 1.0); */
+    /* glVertex2f(pos_x, pos_y + current_char->size_y); */
 
-    glEnd();
+    /* glEnd(); */
 
     pos_x += current_char->size_x;
   }
