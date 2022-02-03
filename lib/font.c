@@ -127,7 +127,6 @@ FluxFont flux_font_load_file(const char *font_path, uint8_t font_size) {
 void flux_font_draw_text(FluxRenderContext context, FluxFont font, const char *text, float pos_x,
                          float pos_y) {
   float x, y;
-  char c = 0;
   uint8_t i = 0;
   uint8_t num_chars = 0;
   FluxFontChar *current_char = NULL;
