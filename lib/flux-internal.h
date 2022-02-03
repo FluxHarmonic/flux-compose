@@ -126,9 +126,6 @@ extern ValueHeader *flux_graphics_func_show_preview_window(VectorCursor *list_cu
                                                            ValueCursor *value_cursor);
 extern ValueHeader *flux_graphics_func_circle(VectorCursor *list_cursor, ValueCursor *value_cursor);
 
-// This macro makes it possible to write GLSL as if it's embedded C code
-#define GLSL(src) "#version 330 core\n" #src
-
 // Texture -------------------------------------------
 
 struct _FluxTexture {

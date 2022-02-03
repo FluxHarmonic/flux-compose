@@ -1,7 +1,13 @@
+#define GLFW_INCLUDE_NONE
+
 #include <GLFW/glfw3.h>
+#include <flux-internal.h>
 #include <flux.h>
+#include <fontconfig/fontconfig.h>
 #include <ft2build.h>
+#include <glad/glad.h>
 #include <inttypes.h>
+#include <stdbool.h>
 #include <string.h>
 #include FT_FREETYPE_H
 
@@ -9,9 +15,7 @@
 #define ASCII_CHAR_END 126
 
 typedef struct {
-  uint32_t texture_id;
-  int32_t size_x;
-  int32_t size_y;
+  struct _FluxTexture texture;
   int32_t bearing_x;
   int32_t bearing_y;
   uint32_t advance;
@@ -20,6 +24,28 @@ typedef struct {
 struct _FluxFont {
   FluxFontChar chars[ASCII_CHAR_END - ASCII_CHAR_START];
 };
+
+const char *FontVertexShaderText =
+    GLSL(layout(location = 0) in vec2 position; layout(location = 1) in vec2 tex_uv;
+
+         uniform mat4 model; uniform mat4 view; uniform mat4 projection;
+
+         out vec2 tex_coords;
+
+         void main() {
+           tex_coords = tex_uv;
+           gl_Position = projection * view * model * vec4(position, 0.0, 1.0);
+         });
+
+const char *FontFragmentShaderText =
+    GLSL(in vec2 tex_coords;
+
+         uniform sampler2D tex0; uniform vec4 color = vec4(1.0, 1.0, 1.0, 1.0);
+
+         void main() {
+           vec4 sampled = vec4(1.0, 1.0, 1.0, texture(tex0, tex_coords).r);
+           gl_FragColor = color * sampled;
+         });
 
 FluxFont flux_font_load_file(const char *font_path, uint8_t font_size) {
   char char_id = 0;
@@ -55,6 +81,9 @@ FluxFont flux_font_load_file(const char *font_path, uint8_t font_size) {
   // TODO: Do I need to reverse this afterward?
   glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 
+  // Does the font have kerning?
+  flux_log("Has kerning: %d\n", FT_HAS_KERNING(face));
+
   // Load glyphs for each character
   for (char_id = ASCII_CHAR_START; char_id < ASCII_CHAR_END + 1; char_id++) {
     // Load the character glyph and information
@@ -66,18 +95,20 @@ FluxFont flux_font_load_file(const char *font_path, uint8_t font_size) {
 
     // Assign glyph metrics
     current_char = &flux_font->chars[char_id - ASCII_CHAR_START];
-    current_char->size_x = face->glyph->bitmap.width;
-    current_char->size_y = face->glyph->bitmap.rows;
+    current_char->texture.width = face->glyph->bitmap.width;
+    current_char->texture.height = face->glyph->bitmap.rows;
     current_char->bearing_x = face->glyph->bitmap_left;
     current_char->bearing_y = face->glyph->bitmap_top;
+    current_char->advance = face->glyph->advance.x;
 
     /* flux_log("Glyph size is: %d / %d\n", current_char->size_x, current_char->size_y); */
 
     // Create the texture and copy the glyph bitmap into it
-    glGenTextures(1, &current_char->texture_id);
-    glBindTexture(GL_TEXTURE_2D, current_char->texture_id);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, current_char->size_x, current_char->size_y, 0, GL_RED,
-                 GL_UNSIGNED_BYTE, face->glyph->bitmap.buffer);
+    glGenTextures(1, &current_char->texture.texture_id);
+    glBindTexture(GL_TEXTURE_2D, current_char->texture.texture_id);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, current_char->texture.width,
+                 current_char->texture.height, 0, GL_RED, GL_UNSIGNED_BYTE,
+                 face->glyph->bitmap.buffer);
 
     // Set texture options to render the glyph correctly
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -93,39 +124,59 @@ FluxFont flux_font_load_file(const char *font_path, uint8_t font_size) {
   return flux_font;
 }
 
-void flux_font_draw_text(FluxFont font, const char *text, float pos_x, float pos_y) {
+void flux_font_draw_text(FluxRenderContext context, FluxFont font, const char *text, float pos_x,
+                         float pos_y) {
+  float x, y;
   char c = 0;
   uint8_t i = 0;
   uint8_t num_chars = 0;
   FluxFontChar *current_char = NULL;
+  static FluxDrawArgs draw_args;
+
+  if (draw_args.shader_program == 0) {
+    const FluxShaderFile shader_files[] = {
+        {GL_VERTEX_SHADER, FontVertexShaderText},
+        {GL_FRAGMENT_SHADER, FontFragmentShaderText},
+    };
+
+    draw_args.shader_program = flux_graphics_shader_compile(shader_files, 2);
+  }
 
   num_chars = strlen(text);
 
   for (i = 0; i < num_chars; i++) {
     // Get the char information
     current_char = font->chars + (text[i] - ASCII_CHAR_START);
-    /* flux_log("%d / %d\n", current_char->size_x, current_char->size_y); */
 
-    /* glBindTexture(GL_TEXTURE_2D, current_char->texture_id); */
+    x = pos_x + current_char->bearing_x;
+    y = pos_y - current_char->bearing_y;
 
-    /* glBegin(GL_QUADS); */
+    flux_graphics_draw_texture_ex(context, &current_char->texture, pos_x, y, &draw_args);
 
-    /* glTexCoord2d(0, 0); */
-    /* glVertex2f(pos_x, pos_y); */
-
-    /* glTexCoord2d(1.0, 0); */
-    /* glVertex2f(pos_x + current_char->size_x, pos_y); */
-
-    /* glTexCoord2d(1.0, 1.0); */
-    /* glVertex2f(pos_x + current_char->size_x, pos_y + current_char->size_y); */
-
-    /* glTexCoord2d(0, 1.0); */
-    /* glVertex2f(pos_x, pos_y + current_char->size_y); */
-
-    /* glEnd(); */
-
-    pos_x += current_char->size_x;
+    pos_x += current_char->advance >> 6;
   }
 
   glBindTexture(GL_TEXTURE_2D, 0);
+}
+
+char *flux_font_resolve_path(const char *font_name) {
+  // Initialize fontconfig library
+  FcConfig *config = FcInitLoadConfigAndFonts();
+
+  // Configure the search pattern
+  FcPattern *pattern = FcNameParse((FcChar8 *)font_name);
+  FcConfigSubstitute(config, pattern, FcMatchPattern);
+  FcDefaultSubstitute(pattern);
+
+  // Find a font that matches the query pattern
+  FcResult result;
+  FcPattern *font = FcFontMatch(config, pattern, &result);
+  if (font) {
+    FcChar8 *file_path = NULL;
+    if (FcPatternGetString(font, FC_FILE, 0, &file_path) == FcResultMatch) {
+      return strdup((char *)file_path);
+    }
+  }
+
+  return NULL;
 }

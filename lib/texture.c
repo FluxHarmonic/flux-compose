@@ -1,3 +1,4 @@
+#define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
 #include <flux-internal.h>
 #include <flux.h>
@@ -38,11 +39,6 @@ FluxTexture flux_texture_png_load(char *file_path) {
   if (ret) {
     flux_log("Error reading PNG file header: %s\n", spng_strerror(ret));
   }
-
-  // TODO: Remove this
-  /* flux_log("width: %u\nheight: %u\nbit depth: %u\ncolor type: %u\ncomp: %u\n filt: %u\ninter: %u\n", */
-  /*          header.width, header.height, header.bit_depth, header.compression_method, */
-  /*          header.filter_method, header.interlace_method); */
 
   ret = spng_decoded_image_size(ctx, fmt, &image_data_size);
   if (ret) {

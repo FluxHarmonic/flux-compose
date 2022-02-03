@@ -1,67 +1,47 @@
-#include <glad/glad.h>
+#define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
+#include <cglm/cglm.h>
 #include <flux-internal.h>
 #include <flux.h>
+#include <glad/glad.h>
 #include <inttypes.h>
 #include <math.h>
 #include <pthread.h>
 #include <stdlib.h>
 #include <string.h>
-#include <cglm/cglm.h>
 
 // model: affecting the shape and translation of the object
 // view: affecting the position of the camera, possibly scale (make camera lens bigger/smaller)
 // projection: projecting to screen coordinates
 
-const char *DefaultVertexShaderText = GLSL(
-  layout (location = 0) in vec2 a_vec;
+const char *DefaultVertexShaderText =
+    GLSL(layout(location = 0) in vec2 a_vec;
 
-  uniform mat4 model;
-  uniform mat4 view;
-  uniform mat4 projection;
+         uniform mat4 model; uniform mat4 view; uniform mat4 projection;
 
-  void main()
-  {
-    gl_Position = projection * view * model * vec4(a_vec, 0.0, 1.0);
-  }
-);
+         void main() { gl_Position = projection * view * model * vec4(a_vec, 0.0, 1.0); });
 
-const char *DefaultFragmentShaderText = GLSL(
-  uniform vec4 color = vec4(1.0, 1.0, 1.0, 1.0);
-  void main()
-  {
-    gl_FragColor = color;
-  }
-);
+const char *DefaultFragmentShaderText =
+    GLSL(uniform vec4 color = vec4(1.0, 1.0, 1.0, 1.0); void main() { gl_FragColor = color; });
 
-const char *TexturedVertexShaderText = GLSL(
-  layout (location = 0) in vec2 position;
-  layout (location = 1) in vec2 tex_uv;
+const char *TexturedVertexShaderText =
+    GLSL(layout(location = 0) in vec2 position; layout(location = 1) in vec2 tex_uv;
 
-  uniform mat4 model;
-  uniform mat4 view;
-  uniform mat4 projection;
+         uniform mat4 model; uniform mat4 view; uniform mat4 projection;
 
-  out vec2 tex_coords;
+         out vec2 tex_coords;
 
-  void main()
-  {
-    tex_coords = tex_uv;
-    gl_Position = projection * view * model * vec4(position, 0.0, 1.0);
-  }
-);
+         void main() {
+           tex_coords = tex_uv;
+           gl_Position = projection * view * model * vec4(position, 0.0, 1.0);
+         });
 
-const char *TexturedFragmentShaderText = GLSL(
-  in vec2 tex_coords;
+const char *TexturedFragmentShaderText =
+    GLSL(in vec2 tex_coords;
 
-  uniform sampler2D tex0;
-  uniform vec4 color = vec4(1.0, 1.0, 1.0, 1.0);
+         uniform sampler2D tex0; uniform vec4 color = vec4(1.0, 1.0, 1.0, 1.0);
 
-  void main()
-  {
-    gl_FragColor = texture(tex0, tex_coords) * color;
-  }
-);
+         void main() { gl_FragColor = texture(tex0, tex_coords) * color; });
 
 uint8_t flux_graphics_initialized = 0;
 pthread_t flux_graphics_thread_handle;
@@ -77,11 +57,6 @@ struct _FluxWindow {
   struct _FluxRenderContext context;
   GLFWwindow *glfwWindow;
 };
-
-typedef struct {
-  GLenum shader_type;
-  const char *shader_text;
-} FluxShaderFile;
 
 // TODO: Eventually store this in the scripting layer memory
 FluxWindow preview_window;
@@ -178,7 +153,7 @@ GLuint flux_graphics_shader_compile(const FluxShaderFile *shader_files, uint32_t
     glShaderSource(shader_id, 1, &shader_files[i].shader_text, NULL);
     glCompileShader(shader_id);
 
-    int  success = 0;
+    int success = 0;
     char infoLog[512];
     glGetShaderiv(shader_id, GL_COMPILE_STATUS, &success);
     if (success == GL_FALSE) {
@@ -195,7 +170,7 @@ GLuint flux_graphics_shader_compile(const FluxShaderFile *shader_files, uint32_t
   return shader_program;
 }
 
-void flux_graphics_shader_mat4_set(uint shader_program_id, const char* uniform_name, mat4 matrix) {
+void flux_graphics_shader_mat4_set(uint shader_program_id, const char *uniform_name, mat4 matrix) {
   unsigned int uniformLoc = glGetUniformLocation(shader_program_id, uniform_name);
   if (uniformLoc == -1) {
     PANIC("Could not find shader matrix parameter: %s\n", uniform_name);
@@ -208,16 +183,17 @@ void flux_graphics_draw_rect(FluxWindow window, float x, float y, float width, f
   // TODO: This needs a fragment shader to render correctly
 }
 
-void flux_graphics_draw_rect_fill(FluxRenderContext context, float x, float y, float w, float h, vec4 color) {
+void flux_graphics_draw_rect_fill(FluxRenderContext context, float x, float y, float w, float h,
+                                  vec4 color) {
   static GLuint shader_program = 0;
-  static GLuint rect_vertex_array  = 0;
+  static GLuint rect_vertex_array = 0;
   static GLuint rect_vertex_buffer = 0;
   static GLuint rect_element_buffer = 0;
 
   if (shader_program == 0) {
     const FluxShaderFile shader_files[] = {
-        { GL_VERTEX_SHADER, DefaultVertexShaderText },
-        { GL_FRAGMENT_SHADER, DefaultFragmentShaderText },
+        {GL_VERTEX_SHADER, DefaultVertexShaderText},
+        {GL_FRAGMENT_SHADER, DefaultFragmentShaderText},
     };
     shader_program = flux_graphics_shader_compile(shader_files, 2);
   }
@@ -231,16 +207,16 @@ void flux_graphics_draw_rect_fill(FluxRenderContext context, float x, float y, f
     glGenBuffers(1, &rect_element_buffer);
 
     float vertices[] = {
-      // Positions
-      0.5f,  0.5f,   // top right
-      0.5f, -0.5f,   // bottom right
-      -0.5f, -0.5f,   // bottom left
-      -0.5f,  0.5f,   // top left
+        // Positions
+        0.5f,  0.5f,  // top right
+        0.5f,  -0.5f, // bottom right
+        -0.5f, -0.5f, // bottom left
+        -0.5f, 0.5f,  // top left
     };
 
     unsigned int indices[] = {
-      0, 1, 2, // first triangle
-      2, 3, 0  // second triangle
+        0, 1, 2, // first triangle
+        2, 3, 0  // second triangle
     };
 
     glBindVertexArray(rect_vertex_array);
@@ -259,12 +235,14 @@ void flux_graphics_draw_rect_fill(FluxRenderContext context, float x, float y, f
 
   // Model matrix is scaled to size and translated
   mat4 model;
-  glm_translate_make(model, (vec3){ x + (w / 2.f), y + (h / 2.f), 0.f });
-  glm_scale(model, (vec3){ w, h, 0.f });
+  glm_translate_make(model, (vec3){x + (w / 2.f), y + (h / 2.f), 0.f});
+  glm_scale(model, (vec3){w, h, 0.f});
 
   // Set the uniforms
-  glUniformMatrix4fv(glGetUniformLocation(shader_program, "projection"), 1, GL_FALSE, (float *)context->screen_matrix);
-  glUniformMatrix4fv(glGetUniformLocation(shader_program, "view"), 1, GL_FALSE, (float *)context->view_matrix);
+  glUniformMatrix4fv(glGetUniformLocation(shader_program, "projection"), 1, GL_FALSE,
+                     (float *)context->screen_matrix);
+  glUniformMatrix4fv(glGetUniformLocation(shader_program, "view"), 1, GL_FALSE,
+                     (float *)context->view_matrix);
   glUniformMatrix4fv(glGetUniformLocation(shader_program, "model"), 1, GL_FALSE, (float *)model);
   glUniform4fv(glGetUniformLocation(shader_program, "color"), 1, (float *)color);
 
@@ -296,17 +274,27 @@ void flux_graphics_draw_args_center(FluxDrawArgs *args, bool centered) {
 void flux_graphics_draw_texture_ex(FluxRenderContext context, FluxTexture texture, float x, float y,
                                    FluxDrawArgs *args) {
   float bx, by;
-  static GLuint shader_program = 0;
-  static GLuint rect_vertex_array  = 0;
+  GLuint shader_program = 0;
+  static GLuint default_shader_program = 0;
+  static GLuint rect_vertex_array = 0;
   static GLuint rect_vertex_buffer = 0;
   static GLuint rect_element_buffer = 0;
 
+  if (args != NULL) {
+    shader_program = args->shader_program;
+  }
+
+  // Use the default texture shader if one isn't specified
   if (shader_program == 0) {
-    const FluxShaderFile shader_files[] = {
-        { GL_VERTEX_SHADER, TexturedVertexShaderText },
-        { GL_FRAGMENT_SHADER, TexturedFragmentShaderText },
-    };
-    shader_program = flux_graphics_shader_compile(shader_files, 2);
+    if (default_shader_program == 0) {
+      const FluxShaderFile shader_files[] = {
+          {GL_VERTEX_SHADER, TexturedVertexShaderText},
+          {GL_FRAGMENT_SHADER, TexturedFragmentShaderText},
+      };
+      default_shader_program = flux_graphics_shader_compile(shader_files, 2);
+    }
+
+    shader_program = default_shader_program;
   }
 
   // Use the shader
@@ -319,16 +307,16 @@ void flux_graphics_draw_texture_ex(FluxRenderContext context, FluxTexture textur
 
     // Texture coordinates are 0,0 for bottom left and 1,1 for top right
     float vertices[] = {
-      // Positions   // Texture
-       0.5f,  0.5f,  1.f, 1.f, // top right
-       0.5f, -0.5f,  1.f, 0.f, // bottom right
-      -0.5f, -0.5f,  0.f, 0.f, // bottom left
-      -0.5f,  0.5f,  0.f, 1.f, // top left
+        // Positions   // Texture
+        0.5f,  0.5f,  1.f, 1.f, // top right
+        0.5f,  -0.5f, 1.f, 0.f, // bottom right
+        -0.5f, -0.5f, 0.f, 0.f, // bottom left
+        -0.5f, 0.5f,  0.f, 1.f, // top left
     };
 
     unsigned int indices[] = {
-      0, 1, 2, // first triangle
-      2, 3, 0  // second triangle
+        0, 1, 2, // first triangle
+        2, 3, 0  // second triangle
     };
 
     glBindVertexArray(rect_vertex_array);
@@ -356,24 +344,26 @@ void flux_graphics_draw_texture_ex(FluxRenderContext context, FluxTexture textur
 
   // Model matrix is scaled to size and translated
   mat4 model;
-  glm_translate_make(model, (vec3){ x, y, 0.f });
-  glm_scale(model, (vec3){ texture->width, texture->height, 0.f });
+  glm_translate_make(model, (vec3){x, y, 0.f});
+  glm_scale(model, (vec3){texture->width, texture->height, 0.f});
 
   // Rotate and scale as requested
   if (args && (args->flags & FluxDrawScaled) == FluxDrawScaled) {
-    glm_scale(model, (vec3){ args->scale_x, args->scale_y, 0.f });
+    glm_scale(model, (vec3){args->scale_x, args->scale_y, 0.f});
   }
   if (args && (args->flags & FluxDrawRotated) == FluxDrawRotated) {
-    glm_rotate(model, glm_rad(args->rotation), (vec3) { 0.f, 0.f, 1.f});
+    glm_rotate(model, glm_rad(args->rotation), (vec3){0.f, 0.f, 1.f});
   }
 
   mat4 view;
   glm_mat4_identity(view);
 
   // Set the uniforms
-  vec4 color = { 1.f, 1.f, 1.f, 1.f };
-  glUniformMatrix4fv(glGetUniformLocation(shader_program, "projection"), 1, GL_FALSE, (float *)context->screen_matrix);
-  glUniformMatrix4fv(glGetUniformLocation(shader_program, "view"), 1, GL_FALSE, (float *)context->view_matrix);
+  vec4 color = {1.f, 1.f, 1.f, 1.f};
+  glUniformMatrix4fv(glGetUniformLocation(shader_program, "projection"), 1, GL_FALSE,
+                     (float *)context->screen_matrix);
+  glUniformMatrix4fv(glGetUniformLocation(shader_program, "view"), 1, GL_FALSE,
+                     (float *)context->view_matrix);
   glUniformMatrix4fv(glGetUniformLocation(shader_program, "model"), 1, GL_FALSE, (float *)model);
   glUniform4fv(glGetUniformLocation(shader_program, "color"), 1, (float *)color);
 
@@ -442,8 +432,7 @@ void *flux_graphics_render_loop(void *arg) {
   glfwMakeContextCurrent(glfwWindow);
 
   // Bind to OpenGL functions
-  if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
-  {
+  if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
     PANIC("Failed to initialize GLAD!");
     return NULL;
   }
@@ -461,9 +450,16 @@ void *flux_graphics_render_loop(void *arg) {
   glfwSwapInterval(1);
 
   // Load a font
-  jost_font = flux_font_load_file("/gnu/store/1mba63xmanh974yag9g3fh5ilnf7y4jm-font-jost-3.5/share/"
-                                  "fonts/truetype/Jost-500-Medium.ttf",
-                                  200);
+  char *font_name = "Jost Medium";
+  char *font_path = flux_font_resolve_path(font_name);
+  if (!font_path) {
+    flux_log("Could not find a file for font: %d\n", font_name);
+  } else {
+    // Load the font and free the allocation font path
+    jost_font = flux_font_load_file(font_path, 200);
+    free(font_path);
+    font_path = NULL;
+  }
 
   // TODO: Should I add scene flipping back here as an event to be handled?
   /* flux_log("Received set scene event!\n"); */
@@ -492,20 +488,22 @@ void *flux_graphics_render_loop(void *arg) {
 
     // Translate the scene preview to the appropriate position, factoring in the
     // scaled size of the scene
-    scale = 1.f;
+    scale = 2.f;
     glm_mat4_identity(context->view_matrix);
-    glm_translate(context->view_matrix, (vec3) { (*window->width / 2) - (1280 / 2.f), (*window->height / 2) - (720 / 2.f), 0.f });
-    glm_scale(context->view_matrix, (vec3) { scale, scale, 1.f });
+    glm_translate(context->view_matrix, (vec3){(*window->width / 2) - (1280 / 2.f),
+                                               (*window->height / 2) - (720 / 2.f), 0.f});
+    glm_scale(context->view_matrix, (vec3){scale, scale, 1.f});
 
     // Draw the preview area rect
-    /* flux_graphics_draw_rect_fill(context, -1.f, -1.f, 1280 + 1.f, 720 + 1.f, (vec4) { 1.0, 1.0, 0.0, 1.0 }); */
+    /* flux_graphics_draw_rect_fill(context, -1.f, -1.f, 1280 + 1.f, 720 + 1.f, (vec4) { 1.0, 1.0,
+     * 0.0, 1.0 }); */
 
     x = 100 + (sin(glfwGetTime() * 7.f) * 100.f);
     y = 100 + (cos(glfwGetTime() * 7.f) * 100.f);
 
     // TODO: Render some stuff
-    flux_graphics_draw_rect_fill(context, x, y, 500, 400, (vec4) { 1.0, 0.0, 0.0, 1.0 });
-    flux_graphics_draw_rect_fill(context, 300, 300, 500, 400, (vec4){ 0.f, 1.f, 0.f, 0.5f });
+    flux_graphics_draw_rect_fill(context, x, y, 500, 400, (vec4){1.0, 0.0, 0.0, 1.0});
+    flux_graphics_draw_rect_fill(context, 300, 300, 500, 400, (vec4){0.f, 1.f, 0.f, 0.5f});
 
     // Apply transforms before rendering
     amt = sin(glfwGetTime() * 5.f);
@@ -518,7 +516,7 @@ void *flux_graphics_render_loop(void *arg) {
 
     // Draw some text if the font got loaded
     if (jost_font) {
-      /* flux_font_draw_text(jost_font, "Flux Harmonic", 20, 20); */
+      flux_font_draw_text(context, jost_font, "Flux Harmonic", 20, 20);
     }
 
     // Render the screen to a file once

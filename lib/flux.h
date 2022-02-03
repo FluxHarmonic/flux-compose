@@ -1,6 +1,8 @@
 #ifndef __FLUX_H
 #define __FLUX_H
 
+#define GLFW_INCLUDE_NONE
+#include <glad/glad.h>
 #include <inttypes.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -52,13 +54,6 @@ extern FluxTexture flux_texture_png_load(char *file_path);
 extern void flux_texture_png_save(const char *file_path, const unsigned char *image_data,
                                   const uint32_t width, const uint32_t height);
 
-// Fonts -----------------------------------------
-
-typedef struct _FluxFont *FluxFont;
-
-extern FluxFont flux_font_load_file(const char *font_path, uint8_t font_size);
-extern void flux_font_draw_text(FluxFont font, const char *text, float pos_x, float pos_y);
-
 // Graphics ---------------------------------------
 
 typedef struct _FluxWindow *FluxWindow;
@@ -75,7 +70,13 @@ typedef struct FluxDrawArgs {
   float scale_x, scale_y;
   float rotation;
   uint8_t flags;
+  GLuint shader_program;
 } FluxDrawArgs;
+
+typedef struct {
+  GLenum shader_type;
+  const char *shader_text;
+} FluxShaderFile;
 
 extern int flux_graphics_init(void);
 extern void flux_graphics_end(void);
@@ -91,9 +92,28 @@ extern void flux_graphics_draw_args_scale(FluxDrawArgs *args, float scale_x, flo
 extern void flux_graphics_draw_args_rotate(FluxDrawArgs *args, float rotation);
 extern void flux_graphics_draw_args_center(FluxDrawArgs *args, bool centered);
 
-extern void flux_graphics_draw_texture(FluxRenderContext context, FluxTexture texture, float x, float y);
-extern void flux_graphics_draw_texture_ex(FluxRenderContext context, FluxTexture texture, float x, float y,
-                                          FluxDrawArgs *args);
+extern void flux_graphics_draw_texture(FluxRenderContext context, FluxTexture texture, float x,
+                                       float y);
+extern void flux_graphics_draw_texture_ex(FluxRenderContext context, FluxTexture texture, float x,
+                                          float y, FluxDrawArgs *args);
+
+extern GLuint flux_graphics_shader_compile(const FluxShaderFile *shader_files,
+                                           uint32_t shader_count);
+
+// Shaders ---------------------------------------
+
+#define GLSL(src) "#version 330 core\n" #src
+
+// Fonts -----------------------------------------
+
+typedef struct _FluxFont *FluxFont;
+
+extern FluxFont flux_font_load_file(const char *font_path, uint8_t font_size);
+extern void flux_font_draw_text(FluxRenderContext context, FluxFont font, const char *text,
+                                float pos_x, float pos_y);
+
+// The returned string must be freed!
+extern char *flux_font_resolve_path(const char *font_name);
 
 // Scene ------------------------------------------
 

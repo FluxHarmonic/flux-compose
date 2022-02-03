@@ -14,4 +14,7 @@
    ;; OpenGL and GLFW
    "mesa"
    "glfw"
-   "freetype"))
+
+   ;; Font rendering
+   "freetype"
+   "fontconfig"))
