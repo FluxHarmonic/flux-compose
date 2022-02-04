@@ -170,7 +170,7 @@ GLuint flux_graphics_shader_compile(const FluxShaderFile *shader_files, uint32_t
   return shader_program;
 }
 
-void flux_graphics_shader_mat4_set(uint shader_program_id, const char *uniform_name, mat4 matrix) {
+void flux_graphics_shader_mat4_set(unsigned int shader_program_id, const char *uniform_name, mat4 matrix) {
   unsigned int uniformLoc = glGetUniformLocation(shader_program_id, uniform_name);
   if (uniformLoc == -1) {
     PANIC("Could not find shader matrix parameter: %s\n", uniform_name);
@@ -273,7 +273,6 @@ void flux_graphics_draw_args_center(FluxDrawArgs *args, bool centered) {
 
 void flux_graphics_draw_texture_ex(FluxRenderContext context, FluxTexture texture, float x, float y,
                                    FluxDrawArgs *args) {
-  float bx, by;
   GLuint shader_program = 0;
   static GLuint default_shader_program = 0;
   static GLuint rect_vertex_array = 0;
