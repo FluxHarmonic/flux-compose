@@ -12,10 +12,11 @@ Here's a list of tasks we've come up with while coding on the project:
 
 ** TODO Use fragment shaders for drawing and effects
 
-https://thebookofshaders.com/ is an excellent resource!
-https://rubendv.be/posts/fwidth/
-[[https://www.ronja-tutorials.com/post/042-dithering/][Dithering in shaders]]
-[[https://open.gl/framebuffers][Drawing to a framebuffer for full-screen effects]]
+- https://thebookofshaders.com/ is an excellent resource!
+- https://rubendv.be/posts/fwidth/
+- [[https://www.ronja-tutorials.com/post/042-dithering/][Dithering in shaders]]
+- [[https://open.gl/framebuffers][Drawing to a framebuffer for full-screen effects]]
+- [[https://gamedev.stackexchange.com/a/83871][Gradients in fragment shaders]]
 
 *** Inspiration
 
