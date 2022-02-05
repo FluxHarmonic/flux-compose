@@ -101,6 +101,9 @@ FluxWindow flux_graphics_window_create(int width, int height, const char *title)
   glfwWindowHint(GLFW_FLOATING, GLFW_TRUE);
   glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 
+  // Enable anti-aliasing
+  glfwWindowHint(GLFW_SAMPLES, 4);
+
   // Create the window
   glfwWindow = glfwCreateWindow(width, height, title, NULL, NULL);
   if (!glfwWindow) {
@@ -472,6 +475,9 @@ void *flux_graphics_render_loop(void *arg) {
 
   // Enable textures
   glEnable(GL_TEXTURE_2D);
+
+  // Enable multisampling (anti-aliasing)
+  glEnable(GL_MULTISAMPLE);
 
   // TODO: REMOVE THIS
   logo = flux_texture_png_load("assets/flux_icon.png");
