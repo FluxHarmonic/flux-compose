@@ -449,13 +449,15 @@ void *flux_graphics_render_loop(void *arg) {
   glfwSwapInterval(1);
 
   // Load a font
-  char *font_name = "Jost Medium";
+  char *font_name = "Jost SemiBold";
+  flux_font_print_all("Jost");
   char *font_path = flux_font_resolve_path(font_name);
+  flux_log("Resolved font path: %s\n", font_path);
   if (!font_path) {
-    flux_log("Could not find a file for font: %d\n", font_name);
+    flux_log("Could not find a file for font: %s\n", font_name);
   } else {
     // Load the font and free the allocation font path
-    jost_font = flux_font_load_file(font_path, 200);
+    jost_font = flux_font_load_file(font_path, 100);
     free(font_path);
     font_path = NULL;
   }
@@ -487,15 +489,14 @@ void *flux_graphics_render_loop(void *arg) {
 
     // Translate the scene preview to the appropriate position, factoring in the
     // scaled size of the scene
-    scale = 2.f;
+    scale = 1.f;
     glm_mat4_identity(context->view_matrix);
     glm_translate(context->view_matrix, (vec3){(*window->width / 2) - (1280 / 2.f),
                                                (*window->height / 2) - (720 / 2.f), 0.f});
     glm_scale(context->view_matrix, (vec3){scale, scale, 1.f});
 
     // Draw the preview area rect
-    /* flux_graphics_draw_rect_fill(context, -1.f, -1.f, 1280 + 1.f, 720 + 1.f, (vec4) { 1.0, 1.0,
-     * 0.0, 1.0 }); */
+    /* flux_graphics_draw_rect_fill(context, -1.f, -1.f, 1280 + 1.f, 720 + 1.f, (vec4) { 1.0, 1.0, 0.0, 1.0 }); */
 
     x = 100 + (sin(glfwGetTime() * 7.f) * 100.f);
     y = 100 + (cos(glfwGetTime() * 7.f) * 100.f);
@@ -515,7 +516,7 @@ void *flux_graphics_render_loop(void *arg) {
 
     // Draw some text if the font got loaded
     if (jost_font) {
-      flux_font_draw_text(context, jost_font, "Flux Harmonic", 20, 20);
+      flux_font_draw_text(context, jost_font, "February 3, 2022", 20, 20);
     }
 
     // Render the screen to a file once

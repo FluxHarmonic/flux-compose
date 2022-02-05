@@ -65,9 +65,10 @@ FluxFont flux_font_load_file(const char *font_path, uint8_t font_size) {
   }
 
   if (face == NULL) {
-    flux_log("NO FACE\n");
+    flux_log("Could not load font: %s\n", font_path);
+    return NULL;
   } else {
-    flux_log("Face has \"%s\" %ld glyphs\n", face->family_name, face->num_glyphs);
+    flux_log("Face \"%s\" has %ld glyphs\n", face->family_name, face->num_glyphs);
   }
 
   // Specify the size of the face needed
@@ -78,11 +79,10 @@ FluxFont flux_font_load_file(const char *font_path, uint8_t font_size) {
   memset(flux_font, 0, sizeof(*flux_font));
 
   // Remove alignment restriction
-  // TODO: Do I need to reverse this afterward?
   glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 
   // Does the font have kerning?
-  flux_log("Has kerning: %d\n", FT_HAS_KERNING(face));
+  /* flux_log("Has kerning: %d\n", FT_HAS_KERNING(face)); */
 
   // Load glyphs for each character
   for (char_id = ASCII_CHAR_START; char_id < ASCII_CHAR_END + 1; char_id++) {
@@ -100,8 +100,6 @@ FluxFont flux_font_load_file(const char *font_path, uint8_t font_size) {
     current_char->bearing_x = face->glyph->bitmap_left;
     current_char->bearing_y = face->glyph->bitmap_top;
     current_char->advance = face->glyph->advance.x;
-
-    /* flux_log("Glyph size is: %d / %d\n", current_char->size_x, current_char->size_y); */
 
     // Create the texture and copy the glyph bitmap into it
     glGenTextures(1, &current_char->texture.texture_id);
@@ -150,7 +148,7 @@ void flux_font_draw_text(FluxRenderContext context, FluxFont font, const char *t
     x = pos_x + current_char->bearing_x;
     y = pos_y - current_char->bearing_y;
 
-    flux_graphics_draw_texture_ex(context, &current_char->texture, pos_x, y, &draw_args);
+    flux_graphics_draw_texture_ex(context, &current_char->texture, x, y, &draw_args);
 
     pos_x += current_char->advance >> 6;
   }
@@ -159,6 +157,8 @@ void flux_font_draw_text(FluxRenderContext context, FluxFont font, const char *t
 }
 
 char *flux_font_resolve_path(const char *font_name) {
+  char *font_path = NULL;
+
   // Initialize fontconfig library
   FcConfig *config = FcInitLoadConfigAndFonts();
 
@@ -173,9 +173,55 @@ char *flux_font_resolve_path(const char *font_name) {
   if (font) {
     FcChar8 *file_path = NULL;
     if (FcPatternGetString(font, FC_FILE, 0, &file_path) == FcResultMatch) {
-      return strdup((char *)file_path);
+      font_path = strdup((char *)file_path);
     }
   }
 
-  return NULL;
+  FcPatternDestroy(font);
+  FcPatternDestroy(pattern);
+  FcConfigDestroy(config);
+
+  return font_path;
+}
+
+void flux_font_print_all(const char *family_name) {
+  // Initialize fontconfig library
+  FcConfig *config = FcInitLoadConfigAndFonts();
+
+  // Create a pattern to find all fonts
+  FcPattern *pattern = NULL;
+  if (family_name) {
+    pattern = FcNameParse((FcChar8 *)family_name);
+  } else {
+    pattern = FcPatternCreate();
+  }
+
+  // Build a font set from the pattern
+  FcObjectSet *object_set = FcObjectSetBuild(FC_FAMILY, FC_STYLE, FC_LANG, FC_FILE, (char *) 0);
+  FcFontSet *font_set = FcFontList(config, pattern, object_set);
+
+  if (font_set) {
+    flux_log("Font count: %d\n", font_set->nfont);
+    for (int i = 0; font_set && i < font_set->nfont; ++i) {
+      FcPattern* font = font_set->fonts[i];
+      FcChar8 *file, *style, *family;
+      if (FcPatternGetString(font, FC_FILE, 0, &file) == FcResultMatch &&
+          FcPatternGetString(font, FC_FAMILY, 0, &family) == FcResultMatch &&
+          FcPatternGetString(font, FC_STYLE, 0, &style) == FcResultMatch)
+      {
+        flux_log("Font path: %s (family %s, style %s)\n", file, family, style);
+      }
+    }
+
+    FcFontSetDestroy(font_set);
+    FcObjectSetDestroy(object_set);
+  } else {
+    flux_log("No fonts found!\n");
+  }
+
+  if (pattern) {
+    FcPatternDestroy(pattern);
+  }
+
+  FcConfigDestroy(config);
 }

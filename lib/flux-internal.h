@@ -134,6 +134,10 @@ struct _FluxTexture {
   uint32_t texture_id;
 };
 
+// Fonts ----------------------------------------------
+
+extern void flux_font_print_all(const char *family_name);
+
 // Scene ---------------------------------------------
 
 typedef struct {
