@@ -184,6 +184,9 @@ void flux_graphics_shader_mat4_set(unsigned int shader_program_id, const char *u
 
 void flux_graphics_draw_rect(FluxWindow window, float x, float y, float width, float height) {
   // TODO: This needs a fragment shader to render correctly
+
+  // A different approach with a vertex shader
+  // https://stackoverflow.com/a/60440937
 }
 
 void flux_graphics_draw_rect_fill(FluxRenderContext context, float x, float y, float w, float h,
