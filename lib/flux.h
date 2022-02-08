@@ -13,6 +13,7 @@
 
 extern void *flux_memory_alloc(size_t size);
 extern void flux_memory_dealloc(void *mem_ptr);
+extern void *flux_memory_realloc(void *mem_ptr, size_t old_size, size_t new_size);
 
 // Vector -----------------------------------------
 
@@ -39,6 +40,7 @@ extern void flux_vector_cursor_init(Vector vector, VectorCursor *cursor);
 
 extern FILE *flux_file_open(const char *file_name, const char *mode_string);
 extern FILE *flux_file_from_string(const char *file_contents);
+extern char *flux_file_read_all(const char *file_path);
 
 // Logging ----------------------------------------
 
@@ -157,11 +159,11 @@ typedef enum {
   ValueKindInteger,
   ValueKindFloat,
   ValueKindString,
-  ValueKindEntity,
-} ValueKind;
+  ValueKindEntity
+} ValueKindOld;
 
 typedef struct {
-  ValueKind kind;
+  ValueKindOld kind;
 } ValueHeader;
 
 typedef struct {

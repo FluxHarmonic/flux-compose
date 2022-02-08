@@ -3,6 +3,7 @@
 #include <flux.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdarg.h>
 #include <string.h>
 
 void *script_value_buffer = NULL;
@@ -588,7 +589,6 @@ ValueHeader *flux_script_eval(FILE *script_file) {
   // TODO: Better return type
   return NULL;
 }
-
 ValueHeader *flux_script_eval_string(char *script_string) {
   FILE *stream = flux_file_from_string(script_string);
   return flux_script_eval(stream);

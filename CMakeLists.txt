@@ -12,18 +12,22 @@ find_package(ZLIB REQUIRED)
 find_package(Freetype REQUIRED)
 find_package(Fontconfig REQUIRED)
 
-include_directories(lib src lib/vendor/spng lib/vendor/miniz lib/vendor/glad/include lib/vendor/cglm)
+include_directories(lib src lib/mesche/include lib/vendor/spng lib/vendor/miniz lib/vendor/glad/include lib/vendor/cglm)
+
+add_library(mesche)
+target_link_libraries(mesche)
 
 add_library(flux)
 target_link_libraries(flux m z ${FREETYPE_LIBRARIES} ${Fontconfig_LIBRARIES} Threads::Threads glfw OpenGL::GL ${CMAKE_DL_LIBS})
 target_include_directories(flux PRIVATE ${FREETYPE_INCLUDE_DIRS} ${FONTCONFIG_INCLUDE_DIRS})
 
 add_executable(flux-compose)
-target_link_libraries(flux-compose flux)
+target_link_libraries(flux-compose flux mesche)
 
 add_executable(run-tests)
 target_link_libraries(run-tests PUBLIC flux)
 
+add_subdirectory(lib/mesche)
 add_subdirectory(lib)
 add_subdirectory(src)
 add_subdirectory(test)
