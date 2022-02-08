@@ -54,14 +54,19 @@ FluxTexture flux_texture_png_load(char *file_path) {
   }
 
   // Create the texture in video memory
-  // TODO: Add options for smoothing and mipmaps here
   glGenTextures(1, &texture_id);
   glBindTexture(GL_TEXTURE_2D, texture_id);
-  glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER,
-                  GL_NEAREST); // GL_NEAREST = no smoothing
-  glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+  /* glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, */
+  /*                 GL_NEAREST); // GL_NEAREST = no smoothing */
+  /* glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST); */
+  glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+  glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+
   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, header.width, header.height, 0, GL_RGBA, GL_UNSIGNED_BYTE,
                image_bytes);
+
+  // TODO: Add options for smoothing and mipmaps here
+  glGenerateTextureMipmap(texture_id);
 
   // Unbind the current texture to unblock future renders
   glBindTexture(GL_TEXTURE_2D, 0);
@@ -71,6 +76,9 @@ FluxTexture flux_texture_png_load(char *file_path) {
   texture->width = header.width;
   texture->height = header.height;
   texture->texture_id = texture_id;
+
+  /* flux_log("The texture \"%s\" is %dx%d\n", file_path, texture->width, texture->height); */
+  flux_log("The texture \"%s\" is %dx%d\n", file_path, header.width, header.height);
 
   // TODO: Free the image data
 

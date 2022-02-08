@@ -48,6 +48,7 @@ pthread_t flux_graphics_thread_handle;
 
 struct _FluxRenderContext {
   vec2 screen_size;
+  vec2 desired_size;
   mat4 screen_matrix;
   mat4 view_matrix;
 };
@@ -115,8 +116,10 @@ FluxWindow flux_graphics_window_create(int width, int height, const char *title)
   window->glfwWindow = glfwWindow;
   window->width = &window->context.screen_size[0];
   window->height = &window->context.screen_size[1];
+  window->context.desired_size[0] = width;
+  window->context.desired_size[1] = height;
   *window->width = width;
-  *window->height = width;
+  *window->height = height;
 
   // Set the "user pointer" of the GLFW window to our window
   glfwSetWindowUserPointer(glfwWindow, window);
@@ -173,7 +176,8 @@ GLuint flux_graphics_shader_compile(const FluxShaderFile *shader_files, uint32_t
   return shader_program;
 }
 
-void flux_graphics_shader_mat4_set(unsigned int shader_program_id, const char *uniform_name, mat4 matrix) {
+void flux_graphics_shader_mat4_set(unsigned int shader_program_id, const char *uniform_name,
+                                   mat4 matrix) {
   unsigned int uniformLoc = glGetUniformLocation(shader_program_id, uniform_name);
   if (uniformLoc == -1) {
     PANIC("Could not find shader matrix parameter: %s\n", uniform_name);
@@ -347,15 +351,18 @@ void flux_graphics_draw_texture_ex(FluxRenderContext context, FluxTexture textur
     y += texture->height / 2.f;
   }
 
+  float scale_x = 1.f, scale_y = 1.f;
+  if (args && (args->flags & FluxDrawScaled) == FluxDrawScaled) {
+    scale_x = args->scale_x;
+    scale_y = args->scale_y;
+  }
+
   // Model matrix is scaled to size and translated
   mat4 model;
-  glm_translate_make(model, (vec3){x, y, 0.f});
-  glm_scale(model, (vec3){texture->width, texture->height, 0.f});
+  glm_translate_make(model, (vec3){x * scale_x, y * scale_y, 0.f});
+  glm_scale(model, (vec3){texture->width * scale_x, texture->height * scale_y, 0.f});
 
   // Rotate and scale as requested
-  if (args && (args->flags & FluxDrawScaled) == FluxDrawScaled) {
-    glm_scale(model, (vec3){args->scale_x, args->scale_y, 0.f});
-  }
   if (args && (args->flags & FluxDrawRotated) == FluxDrawRotated) {
     glm_rotate(model, glm_rad(args->rotation), (vec3){0.f, 0.f, 1.f});
   }
@@ -423,13 +430,116 @@ void flux_graphics_save_to_png(FluxWindow window, const char *output_file_path) 
   free(screen_bytes);
 }
 
+void flux_graphics_render_test(FluxRenderContext context) {
+  static FluxTexture logo = NULL;
+  static FluxFont jost_font = NULL;
+
+  static FluxDrawArgs draw_args;
+  float x, y, scale, amt = 0.f;
+
+  if (!logo) {
+    logo = flux_texture_png_load("assets/flux_icon.png");
+  }
+
+  // Load a font
+  if (!jost_font) {
+    char *font_name = "Jost SemiBold";
+    char *font_path = flux_font_resolve_path(font_name);
+    flux_log("Resolved font path: %s\n", font_path);
+    if (!font_path) {
+      flux_log("Could not find a file for font: %s\n", font_name);
+    } else {
+      // Load the font and free the allocation font path
+      jost_font = flux_font_load_file(font_path, 100);
+      free(font_path);
+      font_path = NULL;
+    }
+  }
+
+  x = 100 + (sin(glfwGetTime() * 7.f) * 100.f);
+  y = 100 + (cos(glfwGetTime() * 7.f) * 100.f);
+
+  // TODO: Render some stuff
+  flux_graphics_draw_rect_fill(context, x, y, 500, 400, (vec4){1.0, 0.0, 0.0, 1.0});
+  flux_graphics_draw_rect_fill(context, 300, 300, 500, 400, (vec4){0.f, 1.f, 0.f, 0.5f});
+
+  // Apply transforms before rendering
+  amt = sin(glfwGetTime() * 5.f);
+  scale = 1.0 + amt * 0.3;
+  flux_graphics_draw_args_scale(&draw_args, scale, scale);
+  flux_graphics_draw_args_rotate(&draw_args, amt * 0.1 * 180);
+
+  // Render a texture
+  flux_graphics_draw_texture_ex(context, logo, 950, 350, &draw_args);
+
+  // Draw some text if the font got loaded
+  if (jost_font) {
+    flux_font_draw_text(context, jost_font, "February 3, 2022", 20, 20);
+  }
+}
+
+void flux_graphics_render_thumbnail(FluxRenderContext context) {
+  static FluxTexture logo = NULL;
+  static FluxTexture background = NULL;
+  static FluxFont jost_font = NULL;
+
+  float scale, amt = 1.f;
+  FluxDrawArgs draw_args;
+  draw_args.shader_program = 0;
+
+  if (!logo) {
+    logo = flux_texture_png_load("/home/daviwil/Notes/Shows/FluxHarmonic/Media/Flux Harmonic.png");
+  }
+  if (!background) {
+    background = flux_texture_png_load(
+        "/home/daviwil/Notes/Shows/FluxHarmonic/Media/Flux-Harmonic-BG-Base.png");
+  }
+
+  // Load a font
+  if (!jost_font) {
+    char *font_name = "Jost SemiBold";
+    char *font_path = flux_font_resolve_path(font_name);
+    flux_log("Resolved font path: %s\n", font_path);
+    if (!font_path) {
+      flux_log("Could not find a file for font: %s\n", font_name);
+    } else {
+      // Load the font and free the allocation font path
+      jost_font = flux_font_load_file(font_path, 450);
+      free(font_path);
+      font_path = NULL;
+    }
+  }
+
+  // Apply transforms before rendering
+
+  // Render the thumbnail
+  if (background) {
+    scale = context->desired_size[0] / logo->width;
+    flux_graphics_draw_args_scale(&draw_args, scale, scale);
+    flux_graphics_draw_args_center(&draw_args, false);
+    flux_graphics_draw_texture_ex(context, background, 0, 0, &draw_args);
+  }
+
+  flux_graphics_draw_rect_fill(context, 0, 0, context->desired_size[0], context->desired_size[1],
+                               (vec4){28.f / 255, 30.f / 255, 31.f / 255, 0.93});
+
+  scale = 1700.f / logo->width;
+  flux_graphics_draw_args_scale(&draw_args, scale, scale);
+  flux_graphics_draw_args_center(&draw_args, false);
+  flux_graphics_draw_texture_ex(context, logo, context->desired_size[0] / 2.f - 500,
+                                context->desired_size[1] / 5.f, &draw_args);
+  /* flux_graphics_draw_texture_ex(context, logo, 2500 / 2.f, 0, &draw_args); */
+
+  // Draw some text if the font got loaded
+  if (jost_font) {
+    flux_font_draw_text(context, jost_font, "February 10, 2022", 465,
+                        context->desired_size[1] - 150);
+  }
+}
+
 void *flux_graphics_render_loop(void *arg) {
   int has_saved = 0; // TODO: Remove this hack!
-  float amt, scale;
   FluxWindow window = arg;
-  FluxTexture logo = NULL;
-  FluxDrawArgs draw_args;
-  FluxFont jost_font = NULL;
   FluxRenderContext context = &window->context;
   GLFWwindow *glfwWindow = window->glfwWindow;
 
@@ -454,20 +564,6 @@ void *flux_graphics_render_loop(void *arg) {
   // Set the swap interval to prevent tearing
   glfwSwapInterval(1);
 
-  // Load a font
-  char *font_name = "Jost SemiBold";
-  flux_font_print_all("Jost");
-  char *font_path = flux_font_resolve_path(font_name);
-  flux_log("Resolved font path: %s\n", font_path);
-  if (!font_path) {
-    flux_log("Could not find a file for font: %s\n", font_name);
-  } else {
-    // Load the font and free the allocation font path
-    jost_font = flux_font_load_file(font_path, 100);
-    free(font_path);
-    font_path = NULL;
-  }
-
   // TODO: Should I add scene flipping back here as an event to be handled?
   /* flux_log("Received set scene event!\n"); */
   /* flip_current_scene(&current_scene); */
@@ -475,6 +571,7 @@ void *flux_graphics_render_loop(void *arg) {
   // Enable blending
   glEnable(GL_BLEND);
   glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+  /* glBlendFunc(GL_SRC_COLOR, GL_ONE_MINUS_SRC_COLOR); */
 
   // Enable textures
   glEnable(GL_TEXTURE_2D);
@@ -482,51 +579,29 @@ void *flux_graphics_render_loop(void *arg) {
   // Enable multisampling (anti-aliasing)
   glEnable(GL_MULTISAMPLE);
 
-  // TODO: REMOVE THIS
-  logo = flux_texture_png_load("assets/flux_icon.png");
-
   while (!glfwWindowShouldClose(glfwWindow)) {
-    float x;
-    float y;
-
     // Poll for events for this frame
     glfwPollEvents();
 
     // Clear the screen
-    glClearColor(0.0, 0.0, 0.0, 0.0);
+    glClearColor(0.0, 0.0, 0.0, 1.0);
     glClear(GL_COLOR_BUFFER_BIT);
 
     // Translate the scene preview to the appropriate position, factoring in the
     // scaled size of the scene
-    scale = 1.f;
+    float scale = 1.0f;
     glm_mat4_identity(context->view_matrix);
-    glm_translate(context->view_matrix, (vec3){(*window->width / 2) - (1280 / 2.f),
-                                               (*window->height / 2) - (720 / 2.f), 0.f});
+    /* glm_translate(context->view_matrix, (vec3){(*window->width / 2) - (1280 / 2.f), */
+    /*                                            (*window->height / 2) - (720 / 2.f), 0.f}); */
     glm_scale(context->view_matrix, (vec3){scale, scale, 1.f});
 
     // Draw the preview area rect
-    /* flux_graphics_draw_rect_fill(context, -1.f, -1.f, 1280 + 1.f, 720 + 1.f, (vec4) { 1.0, 1.0, 0.0, 1.0 }); */
+    /* flux_graphics_draw_rect_fill(context, -1.f, -1.f, 1280 + 1.f, 720 + 1.f, (vec4) { 1.0, 1.0,
+     * 0.0, 1.0 }); */
 
-    x = 100 + (sin(glfwGetTime() * 7.f) * 100.f);
-    y = 100 + (cos(glfwGetTime() * 7.f) * 100.f);
-
-    // TODO: Render some stuff
-    flux_graphics_draw_rect_fill(context, x, y, 500, 400, (vec4){1.0, 0.0, 0.0, 1.0});
-    flux_graphics_draw_rect_fill(context, 300, 300, 500, 400, (vec4){0.f, 1.f, 0.f, 0.5f});
-
-    // Apply transforms before rendering
-    amt = sin(glfwGetTime() * 5.f);
-    scale = 1.0 + amt * 0.3;
-    flux_graphics_draw_args_scale(&draw_args, scale, scale);
-    flux_graphics_draw_args_rotate(&draw_args, amt * 0.1 * 180);
-
-    // Render a texture
-    flux_graphics_draw_texture_ex(context, logo, 950, 350, &draw_args);
-
-    // Draw some text if the font got loaded
-    if (jost_font) {
-      flux_font_draw_text(context, jost_font, "February 3, 2022", 20, 20);
-    }
+    // Render the test scene
+    flux_graphics_render_test(context);
+    /* flux_graphics_render_thumbnail(context); */
 
     // Render the screen to a file once
     // TODO: Remove this!
@@ -599,7 +674,7 @@ ValueHeader *flux_graphics_func_show_preview_window(VectorCursor *list_cursor,
   if (preview_window == NULL) {
     // Start the loop and wait until it finishes
     flux_graphics_init();
-    preview_window = flux_graphics_window_create(1280, 720, "Flux Compose");
+    preview_window = flux_graphics_window_create(2500, 1408, "Flux Compose");
     flux_graphics_window_show(preview_window);
     flux_graphics_loop_start(preview_window);
   }
