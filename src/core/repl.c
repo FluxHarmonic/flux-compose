@@ -1,24 +1,27 @@
 #include <flux.h>
 #include <stdio.h>
-
-#define INPUT_BUFFER_LIMIT 2048
+#include <mesche.h>
 
 void flux_repl_start(FILE *fp) {
-  char input_buffer[INPUT_BUFFER_LIMIT];
+  char input_buffer[2048];
   input_buffer[0] = '\0';
+
+  VM vm;
+  mesche_vm_init(&vm);
 
   printf("Welcome to the Flux Compose REPL!\n\n");
 
   while (!feof(fp)) {
     printf("> ");
-    if (fgets(input_buffer, INPUT_BUFFER_LIMIT, fp) == NULL) {
+    if (fgets(input_buffer, sizeof(input_buffer), fp) == NULL) {
+      mesche_vm_free(&vm);
       PANIC("Error in fgets");
     }
 
-    flux_log("EXPR: %s\n", input_buffer);
+    /* flux_log("EXPR: %s\n", input_buffer); */
 
     // TODO: Print the value for true REPL
-    flux_script_eval_string(input_buffer);
+    mesche_eval_string(&vm, input_buffer);
     input_buffer[0] = '\0';
   }
 }

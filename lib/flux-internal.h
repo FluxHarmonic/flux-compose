@@ -19,11 +19,28 @@ struct _Vector {
 typedef enum {
   TokenKindNone,
   TokenKindParen,
+  TokenKindLeftParen,
+  TokenKindRightParen,
+  TokenKindQuote,
+  TokenKindNil,
+  TokenKindTrue,
   TokenKindString,
   TokenKindSymbol,
   TokenKindKeyword,
+  TokenKindNumber,
   TokenKindInteger,
-  TokenKindFloat
+  TokenKindFloat,
+  TokenKindPlus,
+  TokenKindMinus,
+  TokenKindStar,
+  TokenKindSlash,
+  TokenKindAnd,
+  TokenKindOr,
+  TokenKindNot,
+  TokenKindEqv,
+  TokenKindEqual,
+  TokenKindError,
+  TokenKindEOF
 } TokenKind;
 
 typedef struct {
