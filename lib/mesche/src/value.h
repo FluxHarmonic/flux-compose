@@ -15,7 +15,7 @@ typedef struct ObjectString ObjectString;
 #define AS_BOOL(value) ((value).kind != VALUE_NIL)
 
 #define IS_ANY(value) (true)
-#define IS_T(value) ((value).kind == ValueKindTrue)
+#define IS_T(value) ((value).kind == VALUE_TRUE)
 #define IS_NIL(value) ((value).kind == VALUE_NIL)
 #define IS_NUMBER(value) ((value).kind == VALUE_NUMBER)
 #define IS_STRING(value) object_is_kind(value, ObjectKindString)
