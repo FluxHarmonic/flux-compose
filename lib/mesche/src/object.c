@@ -37,7 +37,7 @@ static uint32_t object_string_hash(const char *key, int length) {
   return hash;
 }
 
-ObjectString *mesche_object_make_string(VM *vm, char *chars, int length) {
+ObjectString *mesche_object_make_string(VM *vm, const char *chars, int length) {
   // Is the string already interned?
   uint32_t hash = object_string_hash(chars, length);
   ObjectString *interned_string = mesche_table_find_key(&vm->strings, chars, length, hash);
@@ -57,9 +57,11 @@ ObjectString *mesche_object_make_string(VM *vm, char *chars, int length) {
 }
 
 void mesche_object_free(Object *object) {
+  ObjectString *string = NULL;
+
   switch (object->kind) {
   case ObjectKindString:
-    ObjectString *string = (ObjectString*)object;
+    string = (ObjectString*)object;
     FREE_SIZE(string, (sizeof(ObjectString) + string->length + 1));
     break;
   default:

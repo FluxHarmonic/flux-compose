@@ -103,6 +103,7 @@ static TokenKind scanner_identifier_type(Scanner *scanner) {
     case 'o': return scanner_check_keyword(scanner, 1, 2, "ot", TokenKindNot);
     case 'i': return scanner_check_keyword(scanner, 1, 2, "il", TokenKindNil);
     }
+    break;
   }
   case 'e':  {
     switch(scanner->start[1]) {
@@ -113,6 +114,7 @@ static TokenKind scanner_identifier_type(Scanner *scanner) {
       }
     }
     }
+    break;
   }
   case 'a': return scanner_check_keyword(scanner, 1, 2, "nd", TokenKindAnd);
   case 'o': return scanner_check_keyword(scanner, 1, 2, "r", TokenKindOr);
@@ -139,9 +141,11 @@ static void scanner_skip_whitespace(Scanner *scanner) {
     case ';':
       while (scanner_peek(scanner) != '\n' && !scanner_at_end(scanner))
         scanner_next_char(scanner);
+      break;
     case '\n':
-      // Fall through to the next case
       scanner->line++;
+      scanner_next_char(scanner);
+      break;
     case ' ':
     case '\r':
     case '\t':

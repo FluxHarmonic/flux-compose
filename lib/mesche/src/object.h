@@ -29,7 +29,7 @@ struct ObjectString {
   char chars[];
 };
 
-ObjectString *mesche_object_make_string(VM *vm, char *chars, int length);
+ObjectString *mesche_object_make_string(VM *vm, const char *chars, int length);
 void mesche_object_free(struct Object *object);
 void mesche_object_print(Value value);
 
