@@ -1,5 +1,7 @@
 include(CheckCCompilerFlag)
 
+option(FLUX_USE_ASAN "Use libASAN in the compiled library and binary" ON)
+
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_FLAGS_DEBUG "-O0 -g -ggdb -DDEBUG")
@@ -43,3 +45,8 @@ add_compile_option_if(-Wunused-variable WUNUSED-VARIABLE)
 add_compile_option_if(-fno-delete-null-pointer-checks
   FNO-DELETE-NULL-POINTER-CHECKS)
 add_compile_option_if(-fno-strict-overflow FNO-STRICT-OVERFLOW)
+
+if(FLUX_USE_ASAN)
+add_compile_options(-fsanitize=address)
+add_link_options(-fsanitize=address)
+endif()
