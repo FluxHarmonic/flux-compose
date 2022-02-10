@@ -5,6 +5,7 @@
 
 #include "value.h"
 #include "chunk.h"
+#include "table.h"
 
 #define VM_STACK_MAX 256
 
@@ -13,6 +14,7 @@ typedef struct {
   uint8_t *ip;
   Value stack[VM_STACK_MAX]; // TODO: Make this dynamically resizable
   Value *stack_top;
+  Table strings;
   Object *objects;
 } VM;
 

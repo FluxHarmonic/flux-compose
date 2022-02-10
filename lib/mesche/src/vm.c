@@ -58,11 +58,15 @@ static void vm_free_objects(VM *vm) {
 void mesche_vm_init(VM *vm) {
   vm->ip = NULL;
   vm->chunk = NULL;
+  vm->objects = NULL;
   vm_reset_stack(vm);
+  mesche_table_init(&vm->strings);
 }
 
 void mesche_vm_free(VM *vm) {
+  mesche_table_free(&vm->strings);
   vm_reset_stack(vm);
+  vm_free_objects(vm);
 }
 
 InterpretResult mesche_vm_run(VM *vm) {

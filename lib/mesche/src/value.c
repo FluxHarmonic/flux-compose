@@ -42,11 +42,7 @@ bool mesche_value_equalp(Value a, Value b) {
 
   switch(a.kind) {
   case VALUE_NUMBER: return AS_NUMBER(a) == AS_NUMBER(b);
-  case VALUE_OBJECT:  {
-    ObjectString *a_str = AS_STRING(a);
-    ObjectString *b_str = AS_STRING(b);
-    return a_str->length == b_str->length && memcmp(a_str->chars, b_str->chars, a_str->length) == 0;
-  }
+  case VALUE_OBJECT: return AS_OBJECT(a) == AS_OBJECT(b);
   default: return false;
   }
 }

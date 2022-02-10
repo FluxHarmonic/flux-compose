@@ -24,6 +24,7 @@ struct Object {
 
 struct ObjectString {
   struct Object object;
+  uint32_t hash;
   int length;
   char chars[];
 };
