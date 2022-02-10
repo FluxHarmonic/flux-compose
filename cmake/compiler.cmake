@@ -16,8 +16,7 @@ function(add_compile_option_if option variable)
   unset(${variable} CACHE)
 endfunction()
 
-add_compile_option_if(-Wdeclaration-after-statement
-  WDECLARATION-AFTER-STATEMENT)
+# add_compile_option_if(-Wdeclaration-after-statement WDECLARATION-AFTER-STATEMENT)
 add_compile_option_if(-Wduplicated-branches WDUPLICATED-BRANCHES)
 add_compile_option_if(-Wduplicated-cond WDUPLICATED-COND)
 add_compile_option_if(-Wempty-body WEMPTY-BODY)
