@@ -21,6 +21,6 @@ void mesche_table_free(Table *table);
 bool mesche_table_set(Table *table, ObjectString *key, Value value);
 bool mesche_table_get(Table *table, ObjectString *key, Value *value);
 void mesche_table_copy(Table *from, Table *to);
-ObjectString *mesche_table_find_key(Table *table, char *chars, int length, uint32_t hash);
+ObjectString *mesche_table_find_key(Table *table, const char *chars, int length, uint32_t hash);
 
 #endif

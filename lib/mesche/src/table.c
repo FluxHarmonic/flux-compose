@@ -128,7 +128,7 @@ void mesche_table_copy(Table *from, Table *to) {
   }
 }
 
-ObjectString *mesche_table_find_key(Table *table, char *chars, int length, uint32_t hash) {
+ObjectString *mesche_table_find_key(Table *table, const char *chars, int length, uint32_t hash) {
   if (table->count == 0) return NULL;
 
   // Use a similar algorithm as normal value lookup, but streamlined for key search
