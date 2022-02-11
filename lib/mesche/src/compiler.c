@@ -75,15 +75,15 @@ static void compiler_error_at_token(Parser *parser, Token *token, const char *me
   parser->had_error = true;
 }
 
-void compiler_error(Parser *parser, const char *message) {
+static void compiler_error(Parser *parser, const char *message) {
   compiler_error_at_token(parser, &parser->previous, message);
 }
 
-void compiler_error_at_current(Parser *parser, const char *message) {
+static void compiler_error_at_current(Parser *parser, const char *message) {
   compiler_error_at_token(parser, &parser->current, message);
 }
 
-void compiler_advance(CompilerContext *ctx) {
+static void compiler_advance(CompilerContext *ctx) {
   ctx->parser->previous = ctx->parser->current;
 
   for (;;) {
@@ -99,9 +99,8 @@ void compiler_advance(CompilerContext *ctx) {
   /* printf("ADVANCED TO: %d\n", ctx->parser->current.kind); */
 }
 
-void compiler_consume(CompilerContext *ctx, TokenKind kind, const char *message) {
+static void compiler_consume(CompilerContext *ctx, TokenKind kind, const char *message) {
   if (ctx->parser->current.kind == kind) {
-    /* printf("CONSUME %d\n", kind); */
     compiler_advance(ctx);
     return;
   }
@@ -110,7 +109,47 @@ void compiler_consume(CompilerContext *ctx, TokenKind kind, const char *message)
   compiler_error_at_current(ctx->parser, message);
 }
 
-void compiler_parse_operator_call(CompilerContext *ctx, Token *call_token) {
+
+// Predefine the main parser function
+static void compiler_parse_expr(CompilerContext *ctx);
+
+static uint8_t compiler_parse_symbol(CompilerContext *ctx) {
+  // TODO: Find the index of an existing constant for the same symbol!
+  uint8_t variable_constant =
+    compiler_make_constant(ctx,
+                           OBJECT_VAL(mesche_object_make_string(ctx->vm,
+                                                                ctx->parser->previous.start,
+                                                                ctx->parser->previous.length)));
+
+  return variable_constant;
+}
+
+static void compiler_parse_identifier(CompilerContext *ctx) {
+  uint8_t variable_constant = compiler_parse_symbol(ctx);
+  compiler_emit_bytes(ctx, OP_READ_GLOBAL, variable_constant);
+}
+
+static void compiler_parse_define(CompilerContext *ctx) {
+  compiler_consume(ctx, TokenKindSymbol, "Expected symbol after 'define'");
+
+  uint8_t variable_constant = compiler_parse_symbol(ctx);
+  compiler_parse_expr(ctx);
+  compiler_emit_bytes(ctx, OP_DEFINE_GLOBAL, variable_constant);
+
+  compiler_consume(ctx, TokenKindRightParen, "Expected closing paren.");
+}
+
+static void compiler_parse_set(CompilerContext *ctx) {
+  compiler_consume(ctx, TokenKindSymbol, "Expected symbol after 'set!'");
+
+  uint8_t variable_constant = compiler_parse_symbol(ctx);
+  compiler_parse_expr(ctx);
+  compiler_emit_bytes(ctx, OP_SET_GLOBAL, variable_constant);
+
+  compiler_consume(ctx, TokenKindRightParen, "Expected closing paren.");
+}
+
+static void compiler_parse_operator_call(CompilerContext *ctx, Token *call_token) {
   TokenKind operator = call_token->kind;
   switch(operator) {
   case TokenKindPlus: compiler_emit_byte(ctx, OP_ADD); break;
@@ -122,14 +161,23 @@ void compiler_parse_operator_call(CompilerContext *ctx, Token *call_token) {
   case TokenKindNot:  compiler_emit_byte(ctx, OP_NOT); break;
   case TokenKindEqv:  compiler_emit_byte(ctx, OP_EQV); break;
   case TokenKindEqual:  compiler_emit_byte(ctx, OP_EQUAL); break;
+  case TokenKindDisplay:  compiler_emit_byte(ctx, OP_DISPLAY); break;
   default: return; // We shouldn't hit this
   }
 }
 
-// Predefine the main parser function
-void compiler_parse_expr(CompilerContext *ctx);
+static bool compiler_parse_special_form(CompilerContext *ctx, Token *call_token) {
+  TokenKind operator = call_token->kind;
+  switch(operator) {
+  case TokenKindDefine: compiler_parse_define(ctx); break;
+  case TokenKindSet: compiler_parse_set(ctx); break;
+  default: return false; // No special form found
+  }
 
-void compiler_parse_list(CompilerContext *ctx) {
+  return true;
+}
+
+static void compiler_parse_list(CompilerContext *ctx) {
   // Try to find the call target (this could be an expression!)
   Token call_token = ctx->parser->current;
   compiler_advance(ctx);
@@ -137,6 +185,11 @@ void compiler_parse_list(CompilerContext *ctx) {
   if (ctx->parser->current.kind == TokenKindRightParen) {
     // Is it an empty list?  Error if not quoted
     PANIC("Empty list!");
+  }
+
+  if (compiler_parse_special_form(ctx, &call_token)) {
+    // A special form was parsed, exit here
+    return;
   }
 
   // Parse expressions until we reach a right paren
@@ -158,19 +211,19 @@ void compiler_parse_list(CompilerContext *ctx) {
 
 void (*ParserFunc)(CompilerContext *ctx);
 
-void compiler_parse_number(CompilerContext *ctx) {
+static void compiler_parse_number(CompilerContext *ctx) {
   double value = strtod(ctx->parser->previous.start, NULL);
   compiler_emit_constant(ctx, NUMBER_VAL(value));
 }
 
-void compiler_parse_string(CompilerContext *ctx) {
+static void compiler_parse_string(CompilerContext *ctx) {
   compiler_emit_constant(ctx,
                          OBJECT_VAL(mesche_object_make_string(ctx->vm,
                                                               ctx->parser->previous.start + 1,
                                                               ctx->parser->previous.length - 2)));
 }
 
-void compiler_parse_literal(CompilerContext *ctx) {
+static void compiler_parse_literal(CompilerContext *ctx) {
   switch (ctx->parser->previous.kind) {
   case TokenKindNil: compiler_emit_byte(ctx, OP_NIL); break;
   case TokenKindTrue: compiler_emit_byte(ctx, OP_T); break;
@@ -178,7 +231,7 @@ void compiler_parse_literal(CompilerContext *ctx) {
   }
 }
 
-void compiler_parse_expr(CompilerContext *ctx) {
+static void compiler_parse_expr(CompilerContext *ctx) {
   /* static const ParserFunc[TokenKindEOF] = [NULL, */
   /*                                          NULL, // TokenKindParen */
   /*                                          compiler_parse_list, // TokenKindLeftParen, */
@@ -211,10 +264,13 @@ void compiler_parse_expr(CompilerContext *ctx) {
   } else if (ctx->parser->current.kind == TokenKindString) {
     compiler_advance(ctx);
     compiler_parse_string(ctx);
+  } else if (ctx->parser->current.kind == TokenKindSymbol) {
+    compiler_advance(ctx);
+    compiler_parse_identifier(ctx);
   }
 }
 
-void compiler_end(CompilerContext *ctx) {
+static void compiler_end(CompilerContext *ctx) {
   compiler_emit_return(ctx);
 
   #ifdef DEBUG_PRINT_CODE
@@ -240,9 +296,13 @@ bool mesche_compile_source(VM *vm, const char *script_source, Chunk *chunk) {
   parser.had_error = false;
   parser.panic_mode = false;
 
-  // Find the first legitimate token and then start parsing
+  // Find the first legitimate token and then start parsing until
+  // we reach the end of the source
   compiler_advance(&ctx);
-  compiler_parse_expr(&ctx);
+  for (;;) {
+    if (parser.current.kind == TokenKindEOF) break;
+    compiler_parse_expr(&ctx);
+  }
   compiler_consume(&ctx, TokenKindEOF, "Expected end of expression.");
 
   compiler_end(&ctx);

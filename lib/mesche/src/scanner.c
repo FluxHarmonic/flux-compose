@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <stdbool.h>
 #include <string.h>
 
@@ -109,15 +110,23 @@ static TokenKind scanner_identifier_type(Scanner *scanner) {
     switch(scanner->start[1]) {
     case 'q': {
       switch(scanner->start[2]) {
-        case 'v': return scanner_check_keyword(scanner, 2, 2, "v?", TokenKindEqv);
-        case 'u': return scanner_check_keyword(scanner, 2, 4, "ual?", TokenKindEqual);
+        case 'v': return scanner_check_keyword(scanner, 3, 1, "?", TokenKindEqv);
+        case 'u': return scanner_check_keyword(scanner, 3, 4, "ual?", TokenKindEqual);
       }
     }
     }
     break;
   }
   case 'a': return scanner_check_keyword(scanner, 1, 2, "nd", TokenKindAnd);
-  case 'o': return scanner_check_keyword(scanner, 1, 2, "r", TokenKindOr);
+  case 'o': return scanner_check_keyword(scanner, 1, 1, "r", TokenKindOr);
+  case 'd': {
+    switch(scanner->start[1]) {
+    case 'e': return scanner_check_keyword(scanner, 2, 4, "fine", TokenKindDefine);
+    case 'i': return scanner_check_keyword(scanner, 2, 5, "splay", TokenKindDisplay);
+    }
+    break;
+  }
+  case 's': return scanner_check_keyword(scanner, 1, 3, "et!", TokenKindSet);
   }
 
   return TokenKindSymbol;
@@ -127,7 +136,8 @@ static Token scanner_read_identifier(Scanner *scanner) {
   while (scanner_is_alpha(scanner_peek(scanner)) ||
          scanner_is_digit(scanner_peek(scanner)) ||
          scanner_peek(scanner) == '-' ||
-         scanner_peek(scanner) == '?') {
+         scanner_peek(scanner) == '?' ||
+         scanner_peek(scanner) == '!') {
     scanner_next_char(scanner);
   }
 

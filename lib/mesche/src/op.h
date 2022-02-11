@@ -15,6 +15,10 @@ typedef enum {
   OP_NOT,
   OP_EQV,
   OP_EQUAL,
+  OP_DEFINE_GLOBAL,
+  OP_SET_GLOBAL,
+  OP_READ_GLOBAL,
+  OP_DISPLAY,
   OP_RETURN
 } MescheOpCode;
 

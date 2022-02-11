@@ -15,6 +15,7 @@ typedef struct {
   Value stack[VM_STACK_MAX]; // TODO: Make this dynamically resizable
   Value *stack_top;
   Table strings;
+  Table globals;
   Object *objects;
 } VM;
 

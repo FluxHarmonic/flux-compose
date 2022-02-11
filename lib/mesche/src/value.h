@@ -24,7 +24,6 @@ typedef enum {
   VALUE_NIL,
   VALUE_TRUE,
   VALUE_NUMBER,
-  VALUE_STRING,
   VALUE_OBJECT
 } ValueKind;
 
