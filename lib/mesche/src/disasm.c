@@ -56,6 +56,12 @@ int mesche_disasm_instr(Chunk *chunk, int offset) {
     return mesche_disasm_simple_instr("OP_EQUAL", offset);
   case OP_RETURN:
     return mesche_disasm_simple_instr("OP_RETURN", offset);
+  case OP_DISPLAY:
+    return mesche_disasm_simple_instr("OP_DISPLAY", offset);
+  case OP_DEFINE_GLOBAL:
+    return mesche_disasm_const_instr("OP_DEFINE_GLOBAL", chunk, offset);
+  case OP_READ_GLOBAL:
+    return mesche_disasm_const_instr("OP_READ_GLOBAL", chunk, offset);
   default:
     printf("Unknown opcode: %d\n", instr);
     return offset + 1;

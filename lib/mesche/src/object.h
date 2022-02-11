@@ -14,7 +14,9 @@
 #define AS_CSTRING(value) (((ObjectString *)AS_OBJECT(value))->chars)
 
 typedef enum {
-  ObjectKindString
+  ObjectKindString,
+  ObjectKindSymbol,
+  ObjectKindKeyword
 } ObjectKind;
 
 struct Object {
@@ -23,6 +25,13 @@ struct Object {
 };
 
 struct ObjectString {
+  struct Object object;
+  uint32_t hash;
+  int length;
+  char chars[];
+};
+
+struct ObjectSymbol {
   struct Object object;
   uint32_t hash;
   int length;

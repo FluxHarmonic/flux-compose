@@ -61,10 +61,12 @@ void mesche_vm_init(VM *vm) {
   vm->objects = NULL;
   vm_reset_stack(vm);
   mesche_table_init(&vm->strings);
+  mesche_table_init(&vm->globals);
 }
 
 void mesche_vm_free(VM *vm) {
   mesche_table_free(&vm->strings);
+  mesche_table_free(&vm->globals);
   vm_reset_stack(vm);
   vm_free_objects(vm);
 }
@@ -72,6 +74,7 @@ void mesche_vm_free(VM *vm) {
 InterpretResult mesche_vm_run(VM *vm) {
 #define READ_BYTE() (*vm->ip++)
 #define READ_CONSTANT() (vm->chunk->constants.values[READ_BYTE()])
+#define READ_STRING() AS_STRING(READ_CONSTANT())
 
 // TODO: Don't pop 'a', manipulate top of stack
 #define BINARY_OP(value_type, pred, cast, op)   \
@@ -90,7 +93,7 @@ InterpretResult mesche_vm_run(VM *vm) {
     printf(" ");
     for (Value* slot = vm->stack; slot < vm->stack_top; slot++) {
       printf("[ ");
-      flux_script_print_value(*slot);
+      mesche_value_print(*slot);
       printf(" ]");
     }
     printf("\n");
@@ -99,11 +102,13 @@ InterpretResult mesche_vm_run(VM *vm) {
     #endif
 
     uint8_t instr;
-    Value constant;
+    Value value;
+    ObjectString *name;
+
     switch (instr = READ_BYTE()) {
     case OP_CONSTANT:
-      constant = READ_CONSTANT();
-      vm_stack_push(vm, constant);
+      value = READ_CONSTANT();
+      vm_stack_push(vm, value);
       break;
     case OP_NIL: vm_stack_push(vm, NIL_VAL); break;
     case OP_T: vm_stack_push(vm, T_VAL); break;
@@ -124,12 +129,35 @@ InterpretResult mesche_vm_run(VM *vm) {
       break;
     }
     case OP_RETURN:
-      mesche_value_print(vm_stack_pop(vm));
-      printf("\n");
       return INTERPRET_OK;
+    case OP_DISPLAY:
+      mesche_value_print(vm_stack_pop(vm));
+      break;
+    case OP_DEFINE_GLOBAL:
+      name = READ_STRING();
+      mesche_table_set(&vm->globals, name, vm_stack_peek(vm, 0));
+      vm_stack_pop(vm); // Pop value after adding entry to avoid GC
+      break;
+    case OP_READ_GLOBAL:
+      name = READ_STRING();
+      if (!mesche_table_get(&vm->globals, name, &value)) {
+        vm_runtime_error(vm, "Undefined variable '%s'.", name->chars);
+        return INTERPRET_RUNTIME_ERROR;
+      }
+      vm_stack_push(vm, value);
+      break;
+    case OP_SET_GLOBAL:
+      name = READ_STRING();
+      if(mesche_table_set(&vm->globals, name, vm_stack_peek(vm, 0))) {
+        vm_runtime_error(vm, "Undefined variable '%s'.", name->chars);
+        return INTERPRET_RUNTIME_ERROR;
+      }
+      vm_stack_pop(vm);
+      break;
     }
   }
 
+#undef READ_STRING
 #undef READ_BYTE
 #undef READ_CONSTANT
 #undef BINARY_OP
