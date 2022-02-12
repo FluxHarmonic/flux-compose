@@ -18,6 +18,12 @@ int mesche_disasm_const_instr(const char *name, Chunk *chunk, int offset) {
   return offset + 2;
 }
 
+int mesche_disasm_byte_instr(const char *name, Chunk *chunk, int offset) {
+  uint8_t slot = chunk->code[offset + 1];
+  printf("%-16s %4d\n", name, slot);
+  return offset + 2;
+}
+
 int mesche_disasm_instr(Chunk *chunk, int offset) {
   printf("%04d ", offset);
   if (offset > 0 && chunk->lines[offset] == chunk->lines[offset - 1]) {
@@ -34,6 +40,8 @@ int mesche_disasm_instr(Chunk *chunk, int offset) {
     return mesche_disasm_simple_instr("OP_NIL", offset);
   case OP_T:
     return mesche_disasm_simple_instr("OP_T", offset);
+  case OP_POP:
+    return mesche_disasm_simple_instr("OP_POP", offset);
   case OP_ADD:
     return mesche_disasm_const_instr("OP_ADD", chunk, offset);
   case OP_SUBTRACT:
@@ -62,6 +70,12 @@ int mesche_disasm_instr(Chunk *chunk, int offset) {
     return mesche_disasm_const_instr("OP_DEFINE_GLOBAL", chunk, offset);
   case OP_READ_GLOBAL:
     return mesche_disasm_const_instr("OP_READ_GLOBAL", chunk, offset);
+  case OP_SET_GLOBAL:
+    return mesche_disasm_const_instr("OP_SET_GLOBAL", chunk, offset);
+  case OP_READ_LOCAL:
+    return mesche_disasm_byte_instr("OP_READ_LOCAL", chunk, offset);
+  case OP_SET_LOCAL:
+    return mesche_disasm_byte_instr("OP_SET_LOCAL", chunk, offset);
   default:
     printf("Unknown opcode: %d\n", instr);
     return offset + 1;

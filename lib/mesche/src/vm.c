@@ -5,6 +5,7 @@
 #include "vm.h"
 #include "op.h"
 #include "mem.h"
+#include "util.h"
 #include "chunk.h"
 #include "value.h"
 #include "disasm.h"
@@ -104,6 +105,8 @@ InterpretResult mesche_vm_run(VM *vm) {
     uint8_t instr;
     Value value;
     ObjectString *name;
+    uint8_t slot = 0;
+    Value *prev_stack_top = vm->stack_top;
 
     switch (instr = READ_BYTE()) {
     case OP_CONSTANT:
@@ -112,13 +115,13 @@ InterpretResult mesche_vm_run(VM *vm) {
       break;
     case OP_NIL: vm_stack_push(vm, NIL_VAL); break;
     case OP_T: vm_stack_push(vm, T_VAL); break;
+    case OP_POP: vm_stack_pop(vm); break;
     case OP_ADD: BINARY_OP(NUMBER_VAL, IS_NUMBER, AS_NUMBER, +); break;
     case OP_SUBTRACT: BINARY_OP(NUMBER_VAL, IS_NUMBER, AS_NUMBER, -); break;
     case OP_MULTIPLY: BINARY_OP(NUMBER_VAL, IS_NUMBER, AS_NUMBER, *); break;
     case OP_DIVIDE: BINARY_OP(NUMBER_VAL, IS_NUMBER, AS_NUMBER, /); break;
     case OP_AND: BINARY_OP(BOOL_VAL, IS_ANY, AS_BOOL, &&); break;
     case OP_OR: BINARY_OP(BOOL_VAL, IS_ANY, AS_BOOL, ||); break;
-      // TODO: The OR operator doesn't work exactly right!
     case OP_NOT: vm_stack_push(vm, IS_NIL(vm_stack_pop(vm)) ? T_VAL : NIL_VAL); break;
     case OP_EQUAL:
       // Drop through for now
@@ -131,12 +134,13 @@ InterpretResult mesche_vm_run(VM *vm) {
     case OP_RETURN:
       return INTERPRET_OK;
     case OP_DISPLAY:
-      mesche_value_print(vm_stack_pop(vm));
+      // Peek at the value on the stack
+      mesche_value_print(vm_stack_peek(vm, 0));
       break;
     case OP_DEFINE_GLOBAL:
       name = READ_STRING();
       mesche_table_set(&vm->globals, name, vm_stack_peek(vm, 0));
-      vm_stack_pop(vm); // Pop value after adding entry to avoid GC
+      /* vm_stack_pop(vm); // Pop value after adding entry to avoid GC */
       break;
     case OP_READ_GLOBAL:
       name = READ_STRING();
@@ -146,14 +150,29 @@ InterpretResult mesche_vm_run(VM *vm) {
       }
       vm_stack_push(vm, value);
       break;
+    case OP_READ_LOCAL:
+      slot = READ_BYTE();
+      vm_stack_push(vm, vm->stack[slot]);
+      break;
     case OP_SET_GLOBAL:
       name = READ_STRING();
       if(mesche_table_set(&vm->globals, name, vm_stack_peek(vm, 0))) {
         vm_runtime_error(vm, "Undefined variable '%s'.", name->chars);
         return INTERPRET_RUNTIME_ERROR;
       }
-      vm_stack_pop(vm);
+      /* vm_stack_pop(vm); */
       break;
+    case OP_SET_LOCAL:
+      slot = READ_BYTE();
+      vm->stack[slot] = vm_stack_peek(vm, 0);
+      break;
+    }
+
+    // For now, we enforce that all instructions except OP_POP should produce
+    // (or leave) a value on the stack so that we can be consistent with how
+    // expressions are popped in blocks when their values aren't consumed.
+    if (instr != OP_POP && vm->stack_top < prev_stack_top) {
+      PANIC("Instruction \"%d\" consumed a stack value!\n", instr);
     }
   }
 

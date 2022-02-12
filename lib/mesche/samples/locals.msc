@@ -1,0 +1,7 @@
+(let ((a 5)
+      (b 10))
+  (display "Addition: ")
+  (display (+ a b))
+
+  (display " // Division: ")
+  (display (/ b a)))
