@@ -91,7 +91,7 @@ void mesche_object_free(Object *object) {
 void mesche_object_print(Value value) {
   switch(OBJECT_KIND(value)) {
   case ObjectKindString:
-    printf("\"%s\"", AS_CSTRING(value));
+    printf("%s", AS_CSTRING(value));
     break;
   }
 }

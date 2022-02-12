@@ -5,6 +5,7 @@ typedef enum {
   OP_CONSTANT,
   OP_NIL,
   OP_T,
+  OP_POP,
   OP_ADD,
   OP_SUBTRACT,
   OP_MULTIPLY,
@@ -17,7 +18,9 @@ typedef enum {
   OP_EQUAL,
   OP_DEFINE_GLOBAL,
   OP_SET_GLOBAL,
+  OP_SET_LOCAL,
   OP_READ_GLOBAL,
+  OP_READ_LOCAL,
   OP_DISPLAY,
   OP_RETURN
 } MescheOpCode;
