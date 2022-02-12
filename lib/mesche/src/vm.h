@@ -4,15 +4,22 @@
 #include <stdint.h>
 
 #include "value.h"
-#include "chunk.h"
 #include "table.h"
 
-#define VM_STACK_MAX 256
+#define UINT8_COUNT (UINT8_MAX + 1)
+#define FRAMES_MAX 64
+#define STACK_MAX (FRAMES_MAX * UINT8_COUNT)
 
 typedef struct {
-  Chunk *chunk;
+  ObjectFunction *function;
   uint8_t *ip;
-  Value stack[VM_STACK_MAX]; // TODO: Make this dynamically resizable
+  Value *slots;
+} CallFrame;
+
+typedef struct {
+  CallFrame frames[FRAMES_MAX];
+  int frame_count;
+  Value stack[STACK_MAX]; // TODO: Make this dynamically resizable
   Value *stack_top;
   Table strings;
   Table globals;
@@ -25,8 +32,9 @@ typedef enum {
   INTERPRET_RUNTIME_ERROR,
 } InterpretResult;
 
-extern void mesche_vm_init(VM *vm);
+void mesche_vm_init(VM *vm);
 InterpretResult mesche_vm_run(VM *vm);
-extern void mesche_vm_free(VM *vm);
+void mesche_vm_free(VM *vm);
+InterpretResult mesche_vm_eval_string(VM *vm, const char *script_string);
 
 #endif

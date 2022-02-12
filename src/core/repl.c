@@ -21,7 +21,7 @@ void flux_repl_start(FILE *fp) {
     /* flux_log("EXPR: %s\n", input_buffer); */
 
     // TODO: Print the value for true REPL
-    mesche_eval_string(&vm, input_buffer);
+    mesche_vm_eval_string(&vm, input_buffer);
     input_buffer[0] = '\0';
   }
 }

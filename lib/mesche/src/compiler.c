@@ -28,11 +28,18 @@ typedef struct {
   int depth;
 } Local;
 
+typedef enum {
+  TYPE_FUNCTION,
+  TYPE_SCRIPT
+} FunctionType;
+
 typedef struct {
   VM *vm;
   Parser *parser;
   Scanner *scanner;
-  Chunk *chunk;
+
+  ObjectFunction *function;
+  FunctionType function_type;
 
   Local locals[UINT8_COUNT];
   int local_count;
@@ -40,7 +47,7 @@ typedef struct {
 } CompilerContext;
 
 static void compiler_emit_byte(CompilerContext *ctx, uint8_t byte) {
-  mesche_chunk_write(ctx->chunk, byte, ctx->parser->previous.line);
+  mesche_chunk_write(&ctx->function->chunk, byte, ctx->parser->previous.line);
 }
 
 static void compiler_emit_bytes(CompilerContext *ctx, uint8_t byte1, uint8_t byte2) {
@@ -53,7 +60,7 @@ static void compiler_emit_return(CompilerContext *ctx) {
 }
 
 static uint8_t compiler_make_constant(CompilerContext *ctx, Value value) {
-  int constant = mesche_chunk_constant_add(ctx->chunk, value);
+  int constant = mesche_chunk_constant_add(&ctx->function->chunk, value);
   // TODO: We'll want to make sure we have at least 16 bits for constants
   if (constant > UINT8_MAX) {
     PANIC("Too many constants in one chunk!\n");
@@ -305,20 +312,20 @@ static int compiler_emit_jump(CompilerContext *ctx, uint8_t instruction) {
   compiler_emit_byte(ctx, 0xff);
   compiler_emit_byte(ctx, 0xff);
 
-  return ctx->chunk->count - 2;
+  return ctx->function->chunk.count - 2;
 }
 
 static void compiler_patch_jump(CompilerContext *ctx, int offset) {
   // We offset by -2 to adjust for the size of the jump offset itself
-  int jump = ctx->chunk->count - offset - 2;
+  int jump = ctx->function->chunk.count - offset - 2;
 
   if (jump > UINT16_MAX) {
     compiler_error(ctx, "Attempting to emit jump that is larger than possible jump size.");
   }
 
   // Place the two bytes with the jump delta
-  ctx->chunk->code[offset] = (jump >> 8) & 0xff;
-  ctx->chunk->code[offset + 1] = jump & 0xff;
+  ctx->function->chunk.code[offset] = (jump >> 8) & 0xff;
+  ctx->function->chunk.code[offset + 1] = jump & 0xff;
 }
 
 static void compiler_parse_if(CompilerContext *ctx) {
@@ -473,17 +480,21 @@ static void compiler_parse_expr(CompilerContext *ctx) {
   }
 }
 
-static void compiler_end(CompilerContext *ctx) {
+static ObjectFunction *compiler_end(CompilerContext *ctx) {
+  ObjectFunction *function = ctx->function;
   compiler_emit_return(ctx);
 
   #ifdef DEBUG_PRINT_CODE
   if (!ctx->parser->had_error) {
-    mesche_disasm_chunk(ctx->chunk, "code");
+    mesche_disasm_chunk(&function->chunk,
+                        function->name != NULL ? function->name->chars : "<script>");
   }
   #endif
+
+  return function;
 }
 
-bool mesche_compile_source(VM *vm, const char *script_source, Chunk *chunk) {
+ObjectFunction *mesche_compile_source(VM *vm, const char *script_source) {
   Parser parser;
   Scanner scanner;
   mesche_scanner_init(&scanner, script_source);
@@ -493,13 +504,24 @@ bool mesche_compile_source(VM *vm, const char *script_source, Chunk *chunk) {
     .vm = vm,
     .parser = &parser,
     .scanner = &scanner,
-    .chunk = chunk,
+    .function = NULL,
+    .function_type = TYPE_SCRIPT,
     .local_count = 0,
     .scope_depth = 0
   };
 
+  // Reset parser error state
   parser.had_error = false;
   parser.panic_mode = false;
+
+  // Establish the first local slot
+  Local *local = &ctx.locals[ctx.local_count++];
+  local->depth = 0;
+  local->name.start = "";
+  local->name.length = 0;
+
+  // Create a new function for parsing the top-level
+  ctx.function = mesche_object_make_function(vm);
 
   // Find the first legitimate token and then start parsing until
   // we reach the end of the source
@@ -507,7 +529,7 @@ bool mesche_compile_source(VM *vm, const char *script_source, Chunk *chunk) {
   compiler_parse_block(&ctx, false);
   compiler_consume(&ctx, TokenKindEOF, "Expected end of expression.");
 
-  compiler_end(&ctx);
-
-  return !parser.had_error;
+  // Retrieve the final function and return it if there were no parse errors
+  ObjectFunction *function = compiler_end(&ctx);
+  return parser.had_error ? NULL : function;
 }

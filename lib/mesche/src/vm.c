@@ -3,6 +3,7 @@
 #include <stdarg.h>
 
 #include "vm.h"
+#include "compiler.h"
 #include "op.h"
 #include "mem.h"
 #include "util.h"
@@ -30,10 +31,13 @@ static Value vm_stack_peek(VM *vm, int distance) {
 
 static void vm_reset_stack(VM *vm) {
   vm->stack_top = vm->stack;
+  vm->frame_count = 0;
   vm->objects = NULL;
 }
 
 static void vm_runtime_error(VM *vm, const char *format, ...) {
+  CallFrame *frame = &vm->frames[vm->frame_count - 1];
+
   // TODO: Port to printf
   va_list args;
   va_start(args, format);
@@ -41,8 +45,8 @@ static void vm_runtime_error(VM *vm, const char *format, ...) {
   va_end(args);
   fputs("\n", stderr);
 
-  size_t instruction = vm->ip - vm->chunk->code - 1;
-  int line = vm->chunk->lines[instruction];
+  size_t instruction = frame->ip - frame->function->chunk.code - 1;
+  int line = frame->function->chunk.lines[instruction];
   fprintf(stderr, "[line %d] in script\n", line);
 
   vm_reset_stack(vm);
@@ -57,8 +61,6 @@ static void vm_free_objects(VM *vm) {
 }
 
 void mesche_vm_init(VM *vm) {
-  vm->ip = NULL;
-  vm->chunk = NULL;
   vm->objects = NULL;
   vm_reset_stack(vm);
   mesche_table_init(&vm->strings);
@@ -73,9 +75,11 @@ void mesche_vm_free(VM *vm) {
 }
 
 InterpretResult mesche_vm_run(VM *vm) {
-#define READ_BYTE() (*vm->ip++)
-#define READ_SHORT() (vm->ip += 2, (uint16_t)((vm->ip[-2] << 8) | vm->ip[-1]))
-#define READ_CONSTANT() (vm->chunk->constants.values[READ_BYTE()])
+  CallFrame *frame = &vm->frames[vm->frame_count - 1];
+
+#define READ_BYTE() (*frame->ip++)
+#define READ_SHORT() (frame->ip += 2, (uint16_t)((frame->ip[-2] << 8) | frame->ip[-1]))
+#define READ_CONSTANT() (frame->function->chunk.constants.values[READ_BYTE()])
 #define READ_STRING() AS_STRING(READ_CONSTANT())
 
 // TODO: Don't pop 'a', manipulate top of stack
@@ -100,7 +104,7 @@ InterpretResult mesche_vm_run(VM *vm) {
     }
     printf("\n");
 
-    mesche_disasm_instr(vm->chunk, (int)(vm->ip - vm->chunk->code));
+    mesche_disasm_instr(frame->function->chunk, (int)(frame->ip - frame->function->chunk.code));
     #endif
 
     uint8_t instr;
@@ -135,12 +139,12 @@ InterpretResult mesche_vm_run(VM *vm) {
     }
     case OP_JUMP:
       offset = READ_SHORT();
-      vm->ip += offset;
+      frame->ip += offset;
       break;
     case OP_JUMP_IF_FALSE:
       offset = READ_SHORT();
       if (IS_FALSEY(vm_stack_peek(vm, 0))) {
-        vm->ip += offset;
+        frame->ip += offset;
       }
       break;
     case OP_RETURN:
@@ -164,7 +168,7 @@ InterpretResult mesche_vm_run(VM *vm) {
       break;
     case OP_READ_LOCAL:
       slot = READ_BYTE();
-      vm_stack_push(vm, vm->stack[slot]);
+      vm_stack_push(vm, frame->slots[slot]);
       break;
     case OP_SET_GLOBAL:
       name = READ_STRING();
@@ -176,7 +180,7 @@ InterpretResult mesche_vm_run(VM *vm) {
       break;
     case OP_SET_LOCAL:
       slot = READ_BYTE();
-      vm->stack[slot] = vm_stack_peek(vm, 0);
+      frame->slots[slot] = vm_stack_peek(vm, 0);
       break;
     }
 
@@ -197,8 +201,18 @@ InterpretResult mesche_vm_run(VM *vm) {
 #undef BINARY_OP
 }
 
-InterpretResult mesche_vm_interpret_chunk(VM *vm, Chunk *chunk) {
-  vm->chunk = chunk;
-  vm->ip = vm->chunk->code;
-  mesche_vm_run(vm);
+InterpretResult mesche_vm_eval_string(VM *vm, const char *script_string) {
+  ObjectFunction *function = mesche_compile_source(vm, script_string);
+  if (function == NULL) {
+    return INTERPRET_COMPILE_ERROR;
+  }
+
+  vm_stack_push(vm, OBJECT_VAL(function));
+  CallFrame *frame = &vm->frames[vm->frame_count++];
+  frame->function = function;
+  frame->ip = function->chunk.code;
+  frame->slots = vm->stack;
+
+  // Run the VM starting at the first call frame
+  return mesche_vm_run(vm);
 }
