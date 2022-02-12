@@ -129,6 +129,7 @@ static TokenKind scanner_identifier_type(Scanner *scanner) {
   case 's': return scanner_check_keyword(scanner, 1, 3, "et!", TokenKindSet);
   case 'l': return scanner_check_keyword(scanner, 1, 2, "et", TokenKindLet);
   case 'b': return scanner_check_keyword(scanner, 1, 4, "egin", TokenKindBegin);
+  case 'i': return scanner_check_keyword(scanner, 1, 1, "f", TokenKindIf);
   }
 
   return TokenKindSymbol;

@@ -1,0 +1,5 @@
+;; Why does this crash on multiple lines?
+;; Are we calculating line number wrong? Odd number lines crash...
+(display (if (or nil t)
+             (+ 1 3)
+             (+ 2 4)))

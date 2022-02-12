@@ -300,6 +300,55 @@ static void compiler_parse_let(CompilerContext *ctx) {
   compiler_end_scope(ctx);
 }
 
+static int compiler_emit_jump(CompilerContext *ctx, uint8_t instruction) {
+  compiler_emit_byte(ctx, instruction);
+  compiler_emit_byte(ctx, 0xff);
+  compiler_emit_byte(ctx, 0xff);
+
+  return ctx->chunk->count - 2;
+}
+
+static void compiler_patch_jump(CompilerContext *ctx, int offset) {
+  // We offset by -2 to adjust for the size of the jump offset itself
+  int jump = ctx->chunk->count - offset - 2;
+
+  if (jump > UINT16_MAX) {
+    compiler_error(ctx, "Attempting to emit jump that is larger than possible jump size.");
+  }
+
+  // Place the two bytes with the jump delta
+  ctx->chunk->code[offset] = (jump >> 8) & 0xff;
+  ctx->chunk->code[offset + 1] = jump & 0xff;
+}
+
+static void compiler_parse_if(CompilerContext *ctx) {
+  // Parse predicate
+  compiler_parse_expr(ctx);
+  int jump_origin = compiler_emit_jump(ctx, OP_JUMP_IF_FALSE);
+
+  // Include a pop so that the expression value gets removed from the stack in the truth path
+  compiler_emit_byte(ctx, OP_POP);
+
+  // Parse truth expr
+  compiler_parse_expr(ctx);
+
+  int else_jump = compiler_emit_jump(ctx, OP_JUMP);
+
+  // Patch the jump instruction after the truth path has been compiled
+  compiler_patch_jump(ctx, jump_origin);
+
+  // Include a pop so that the expression value gets removed from the stack
+  compiler_emit_byte(ctx, OP_POP);
+
+  // Parse false expr
+  compiler_parse_expr(ctx);
+
+  // Patch the jump instruction after the false path has been compiled
+  compiler_patch_jump(ctx, else_jump);
+
+  compiler_consume(ctx, TokenKindRightParen, "Expected right paren to end 'if' expression");
+}
+
 static void compiler_parse_operator_call(CompilerContext *ctx, Token *call_token) {
   TokenKind operator = call_token->kind;
   switch(operator) {
@@ -324,6 +373,7 @@ static bool compiler_parse_special_form(CompilerContext *ctx, Token *call_token)
   case TokenKindDefine: compiler_parse_define(ctx); break;
   case TokenKindSet: compiler_parse_set(ctx); break;
   case TokenKindLet: compiler_parse_let(ctx); break;
+  case TokenKindIf: compiler_parse_if(ctx); break;
   default: return false; // No special form found
   }
 
