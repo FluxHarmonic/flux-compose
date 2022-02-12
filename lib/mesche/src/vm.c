@@ -74,6 +74,7 @@ void mesche_vm_free(VM *vm) {
 
 InterpretResult mesche_vm_run(VM *vm) {
 #define READ_BYTE() (*vm->ip++)
+#define READ_SHORT() (vm->ip += 2, (uint16_t)((vm->ip[-2] << 8) | vm->ip[-1]))
 #define READ_CONSTANT() (vm->chunk->constants.values[READ_BYTE()])
 #define READ_STRING() AS_STRING(READ_CONSTANT())
 
@@ -103,6 +104,7 @@ InterpretResult mesche_vm_run(VM *vm) {
     #endif
 
     uint8_t instr;
+    uint8_t offset;
     Value value;
     ObjectString *name;
     uint8_t slot = 0;
@@ -131,6 +133,16 @@ InterpretResult mesche_vm_run(VM *vm) {
       vm_stack_push(vm, BOOL_VAL(mesche_value_equalp(a, b)));
       break;
     }
+    case OP_JUMP:
+      offset = READ_SHORT();
+      vm->ip += offset;
+      break;
+    case OP_JUMP_IF_FALSE:
+      offset = READ_SHORT();
+      if (IS_FALSEY(vm_stack_peek(vm, 0))) {
+        vm->ip += offset;
+      }
+      break;
     case OP_RETURN:
       return INTERPRET_OK;
     case OP_DISPLAY:
@@ -171,12 +183,15 @@ InterpretResult mesche_vm_run(VM *vm) {
     // For now, we enforce that all instructions except OP_POP should produce
     // (or leave) a value on the stack so that we can be consistent with how
     // expressions are popped in blocks when their values aren't consumed.
-    if (instr != OP_POP && vm->stack_top < prev_stack_top) {
-      PANIC("Instruction \"%d\" consumed a stack value!\n", instr);
-    }
+    // TODO: Rethink this check, it doesn't work for binary operations which
+    // pop 2 values from the stack
+    /* if (instr != OP_POP && vm->stack_top < prev_stack_top) { */
+    /*   PANIC("Instruction \"%d\" consumed a stack value! (before: %x, after: %x)\n", instr, prev_stack_top, vm->stack_top); */
+    /* } */
   }
 
 #undef READ_STRING
+#undef READ_SHORT
 #undef READ_BYTE
 #undef READ_CONSTANT
 #undef BINARY_OP

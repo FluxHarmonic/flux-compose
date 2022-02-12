@@ -12,6 +12,7 @@ int mesche_disasm_simple_instr(const char *name, int offset) {
 int mesche_disasm_const_instr(const char *name, Chunk *chunk, int offset) {
   uint8_t constant = chunk->code[offset + 1];
   printf("%-16s %4d  '", name, constant);
+  fflush(stdout);
   mesche_value_print(chunk->constants.values[constant]);
   printf("'\n");
 
@@ -22,6 +23,13 @@ int mesche_disasm_byte_instr(const char *name, Chunk *chunk, int offset) {
   uint8_t slot = chunk->code[offset + 1];
   printf("%-16s %4d\n", name, slot);
   return offset + 2;
+}
+
+int mesche_disasm_jump_instr(const char *name, int sign, Chunk *chunk, int offset) {
+  uint16_t jump = (uint16_t)(chunk->code[offset + 1] << 8);
+  jump |= chunk->code[offset + 2];
+  printf("%-16s %4d -> %d\n", name, offset, offset + 3 + sign * jump);
+  return offset + 3;
 }
 
 int mesche_disasm_instr(Chunk *chunk, int offset) {
@@ -43,15 +51,15 @@ int mesche_disasm_instr(Chunk *chunk, int offset) {
   case OP_POP:
     return mesche_disasm_simple_instr("OP_POP", offset);
   case OP_ADD:
-    return mesche_disasm_const_instr("OP_ADD", chunk, offset);
+    return mesche_disasm_simple_instr("OP_ADD", offset);
   case OP_SUBTRACT:
-    return mesche_disasm_const_instr("OP_SUBTRACT", chunk, offset);
+    return mesche_disasm_simple_instr("OP_SUBTRACT", offset);
   case OP_MULTIPLY:
-    return mesche_disasm_const_instr("OP_MULTIPLY", chunk, offset);
+    return mesche_disasm_simple_instr("OP_MULTIPLY", offset);
   case OP_DIVIDE:
-    return mesche_disasm_const_instr("OP_DIVIDE", chunk, offset);
+    return mesche_disasm_simple_instr("OP_DIVIDE", offset);
   case OP_NEGATE:
-    return mesche_disasm_const_instr("OP_NEGATE", chunk, offset);
+    return mesche_disasm_simple_instr("OP_NEGATE", offset);
   case OP_AND:
     return mesche_disasm_simple_instr("OP_AND", offset);
   case OP_OR:
@@ -76,6 +84,10 @@ int mesche_disasm_instr(Chunk *chunk, int offset) {
     return mesche_disasm_byte_instr("OP_READ_LOCAL", chunk, offset);
   case OP_SET_LOCAL:
     return mesche_disasm_byte_instr("OP_SET_LOCAL", chunk, offset);
+  case OP_JUMP:
+    return mesche_disasm_jump_instr("OP_JUMP", 1, chunk, offset);
+  case OP_JUMP_IF_FALSE:
+    return mesche_disasm_jump_instr("OP_JUMP_IF_FALSE", 1, chunk, offset);
   default:
     printf("Unknown opcode: %d\n", instr);
     return offset + 1;
@@ -85,7 +97,7 @@ int mesche_disasm_instr(Chunk *chunk, int offset) {
 void mesche_disasm_chunk(Chunk *chunk, const char *name) {
   printf("== %s ==\n", name);
 
-  for (int offset = 0; offset < chunk->count; ) {
+  for (int offset = 0; offset < chunk->count; /* Intentionally empty */) {
     offset = mesche_disasm_instr(chunk, offset);
   }
 }
