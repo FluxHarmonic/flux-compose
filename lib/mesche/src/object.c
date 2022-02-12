@@ -75,23 +75,49 @@ ObjectString *mesche_object_make_symbol(VM *vm, const char *chars, int length) {
   return string;
 }
 
+ObjectFunction *mesche_object_make_function(VM *vm) {
+  ObjectFunction *function = ALLOC_OBJECT(vm, ObjectFunction, ObjectKindFunction);
+  function->arity = 0;
+  function->name = NULL;
+  mesche_chunk_init(&function->chunk);
+
+  return function;
+}
+
 void mesche_object_free(Object *object) {
   ObjectString *string = NULL;
+  ObjectFunction *function = NULL;
 
   switch (object->kind) {
   case ObjectKindString:
     string = (ObjectString*)object;
     FREE_SIZE(string, (sizeof(ObjectString) + string->length + 1));
     break;
+  case ObjectKindFunction:
+    function = (ObjectFunction*)object;
+    FREE(ObjectFunction, object);
+    break;
   default:
     PANIC("Don't know how to free object kind %d!", object->kind);
   }
+}
+
+static void print_function(ObjectFunction *function) {
+  if (function->name == NULL) {
+    printf("<script>");
+    return;
+  }
+
+  printf("<fn %s>", function->name->chars);
 }
 
 void mesche_object_print(Value value) {
   switch(OBJECT_KIND(value)) {
   case ObjectKindString:
     printf("%s", AS_CSTRING(value));
+    break;
+  case ObjectKindFunction:
+    print_function(AS_FUNCTION(value));
     break;
   }
 }

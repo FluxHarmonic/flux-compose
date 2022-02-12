@@ -4,6 +4,6 @@
 #include "vm.h"
 #include "scanner.h"
 
-bool mesche_compile_source(VM *vm, const char *script_source, Chunk *chunk);
+ObjectFunction *mesche_compile_source(VM *vm, const char *script_source);
 
 #endif

@@ -35,7 +35,7 @@ int main(int argc, char **argv) {
     /* flux_script_compile(script_file); */
     VM vm;
     mesche_vm_init(&vm);
-    mesche_eval_string(&vm, script_source);
+    mesche_vm_eval_string(&vm, script_source);
 
     // Free the VM and allocated source string
     mesche_vm_free(&vm);
