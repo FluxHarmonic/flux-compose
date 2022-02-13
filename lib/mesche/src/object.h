@@ -43,15 +43,21 @@ struct ObjectSymbol {
   char chars[];
 };
 
+typedef enum {
+  TYPE_FUNCTION,
+  TYPE_SCRIPT
+} FunctionType;
+
 struct ObjectFunction {
   Object object;
+  FunctionType type;
   int arity;
   Chunk chunk;
   ObjectString *name;
 };
 
 ObjectString *mesche_object_make_string(VM *vm, const char *chars, int length);
-ObjectFunction *mesche_object_make_function(VM *vm);
+ObjectFunction *mesche_object_make_function(VM *vm, FunctionType type);
 
 void mesche_object_free(struct Object *object);
 void mesche_object_print(Value value);

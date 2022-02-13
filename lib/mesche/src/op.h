@@ -23,6 +23,7 @@ typedef enum {
   OP_READ_LOCAL,
   OP_JUMP,
   OP_JUMP_IF_FALSE,
+  OP_CALL,
   OP_DISPLAY,
   OP_RETURN
 } MescheOpCode;

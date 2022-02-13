@@ -74,6 +74,27 @@ void mesche_vm_free(VM *vm) {
   vm_free_objects(vm);
 }
 
+static bool vm_call(VM *vm, ObjectFunction *function, uint8_t arg_count) {
+  CallFrame *frame = &vm->frames[vm->frame_count++];
+  frame->function = function;
+  frame->ip = function->chunk.code;
+  frame->slots = vm->stack_top - arg_count - 1;
+  return true;
+}
+
+static bool vm_call_value(VM *vm, Value callee, uint8_t arg_count) {
+  if (IS_OBJECT(callee)) {
+    switch (OBJECT_KIND(callee)) {
+    case ObjectKindFunction:
+      return vm_call(vm, AS_FUNCTION(callee), arg_count);
+    default: break; // Value not callable
+    }
+  }
+
+  vm_runtime_error(vm, "Can functions can be called.");
+  return false;
+}
+
 InterpretResult mesche_vm_run(VM *vm) {
   CallFrame *frame = &vm->frames[vm->frame_count - 1];
 
@@ -112,6 +133,7 @@ InterpretResult mesche_vm_run(VM *vm) {
     Value value;
     ObjectString *name;
     uint8_t slot = 0;
+    uint8_t arg_count;
     Value *prev_stack_top = vm->stack_top;
 
     switch (instr = READ_BYTE()) {
@@ -148,7 +170,22 @@ InterpretResult mesche_vm_run(VM *vm) {
       }
       break;
     case OP_RETURN:
-      return INTERPRET_OK;
+      // Hold on to the function result value before we manipulate the stack
+      value = vm_stack_pop(vm);
+
+      // If we're out of call frames, end execution
+      vm->frame_count--;
+      if (vm->frame_count == 0) {
+        vm_stack_pop(vm);
+        return INTERPRET_OK;
+      }
+
+      // Restore the previous result value, call frame, and value stack pointer
+      // before continuing execution
+      vm->stack_top = frame->slots;
+      vm_stack_push(vm, value);
+      frame = &vm->frames[vm->frame_count - 1];
+      break;
     case OP_DISPLAY:
       // Peek at the value on the stack
       mesche_value_print(vm_stack_peek(vm, 0));
@@ -182,6 +219,16 @@ InterpretResult mesche_vm_run(VM *vm) {
       slot = READ_BYTE();
       frame->slots[slot] = vm_stack_peek(vm, 0);
       break;
+    case OP_CALL:
+      // Call the function with the specified number of arguments
+      arg_count = READ_BYTE();
+      if (!vm_call_value(vm, vm_stack_peek(vm, arg_count), arg_count)) {
+        return INTERPRET_COMPILE_ERROR;
+      }
+
+      // Return to the previous call frame
+      frame = &vm->frames[vm->frame_count - 1];
+      break;
     }
 
     // For now, we enforce that all instructions except OP_POP should produce
@@ -207,11 +254,9 @@ InterpretResult mesche_vm_eval_string(VM *vm, const char *script_string) {
     return INTERPRET_COMPILE_ERROR;
   }
 
+  // Push the top-level function and call it
   vm_stack_push(vm, OBJECT_VAL(function));
-  CallFrame *frame = &vm->frames[vm->frame_count++];
-  frame->function = function;
-  frame->ip = function->chunk.code;
-  frame->slots = vm->stack;
+  vm_call(vm, function, 0);
 
   // Run the VM starting at the first call frame
   return mesche_vm_run(vm);

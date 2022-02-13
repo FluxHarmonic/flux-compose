@@ -1,0 +1,8 @@
+(define my-lambda (lambda (str a b)
+                    (display str)
+                    (display (+ a b))))
+
+(my-lambda "Hey!" 5 10)
+
+((lambda (a)
+   (display a)) "Self invoke!")

@@ -127,7 +127,12 @@ static TokenKind scanner_identifier_type(Scanner *scanner) {
     break;
   }
   case 's': return scanner_check_keyword(scanner, 1, 3, "et!", TokenKindSet);
-  case 'l': return scanner_check_keyword(scanner, 1, 2, "et", TokenKindLet);
+  case 'l': {
+    switch(scanner->start[1]) {
+    case 'e': return scanner_check_keyword(scanner, 2, 1, "t", TokenKindLet);
+    case 'a': return scanner_check_keyword(scanner, 2, 4, "mbda", TokenKindLambda);
+    }
+  }
   case 'b': return scanner_check_keyword(scanner, 1, 4, "egin", TokenKindBegin);
   case 'i': return scanner_check_keyword(scanner, 1, 1, "f", TokenKindIf);
   }

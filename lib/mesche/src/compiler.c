@@ -28,12 +28,9 @@ typedef struct {
   int depth;
 } Local;
 
-typedef enum {
-  TYPE_FUNCTION,
-  TYPE_SCRIPT
-} FunctionType;
+typedef struct CompilerContext {
+  struct CompilerContext *parent;
 
-typedef struct {
   VM *vm;
   Parser *parser;
   Scanner *scanner;
@@ -46,6 +43,28 @@ typedef struct {
   int scope_depth;
 } CompilerContext;
 
+static void compiler_init_context(CompilerContext *ctx, CompilerContext *parent, FunctionType type) {
+  if (parent != NULL) {
+    ctx->parent = parent;
+    ctx->vm = parent->vm;
+    ctx->parser = parent->parser;
+    ctx->scanner = parent->scanner;
+  }
+
+  // TODO: Assert if VM isn't set yet!  Should only happen at top-level scope.
+
+  ctx->function = mesche_object_make_function(ctx->vm, type);
+  ctx->function_type = type;
+  ctx->local_count = 0;
+  ctx->scope_depth = 0;
+
+  // Establish the first local slot
+  Local *local = &ctx->locals[ctx->local_count++];
+  local->depth = 0;
+  local->name.start = "";
+  local->name.length = 0;
+}
+
 static void compiler_emit_byte(CompilerContext *ctx, uint8_t byte) {
   mesche_chunk_write(&ctx->function->chunk, byte, ctx->parser->previous.line);
 }
@@ -57,6 +76,19 @@ static void compiler_emit_bytes(CompilerContext *ctx, uint8_t byte1, uint8_t byt
 
 static void compiler_emit_return(CompilerContext *ctx) {
   compiler_emit_byte(ctx, OP_RETURN);
+}
+
+static ObjectFunction *compiler_end(CompilerContext *ctx) {
+  ObjectFunction *function = ctx->function;
+  compiler_emit_return(ctx);
+
+  #ifdef DEBUG_PRINT_CODE
+  if (!ctx->parser->had_error) {
+    mesche_disasm_function(function);
+  }
+  #endif
+
+  return function;
 }
 
 static uint8_t compiler_make_constant(CompilerContext *ctx, Value value) {
@@ -176,6 +208,9 @@ static int compiler_resolve_local(CompilerContext *ctx, Token *name) {
 }
 
 static void compiler_local_mark_initialized(CompilerContext *ctx) {
+  // If we're in global scope, don't do anything
+  if (ctx->scope_depth == 0) return;
+
   // Mark the latest local variable as initialized
   ctx->locals[ctx->local_count - 1].depth = ctx->scope_depth;
 }
@@ -307,6 +342,43 @@ static void compiler_parse_let(CompilerContext *ctx) {
   compiler_end_scope(ctx);
 }
 
+static void compiler_parse_lambda(CompilerContext *ctx) {
+  // Create a new compiler context for parsing the function body
+  CompilerContext func_ctx;
+  compiler_init_context(&func_ctx, ctx, TYPE_FUNCTION);
+  compiler_begin_scope(&func_ctx);
+
+  // Parse argument list
+  compiler_consume(&func_ctx, TokenKindLeftParen, "Expected left paren to begin argument list.");
+  for (;;) {
+    // Try to parse each argument until we reach a closing paren
+    if (func_ctx.parser->current.kind == TokenKindRightParen) {
+      compiler_consume(&func_ctx, TokenKindRightParen, "Expected right paren to end argument list.");
+      break;
+    }
+
+    // Increase the function argument count (arity)
+    func_ctx.function->arity++;
+    if (func_ctx.function->arity > 255) {
+      compiler_error_at_current(&func_ctx, "Function cannot have more than 255 parameters.");
+    }
+
+    // Parse the argument
+    // TODO: Ensure a symbol comes next
+    compiler_advance(&func_ctx);
+    uint8_t constant = compiler_parse_symbol(&func_ctx);
+    compiler_define_variable(&func_ctx, constant);
+  }
+
+  // Parse body
+  compiler_parse_block(&func_ctx, true);
+  fflush(stdout);
+
+  // Get the parsed function and store it in a constant
+  ObjectFunction *function = compiler_end(&func_ctx);
+  compiler_emit_constant(ctx, OBJECT_VAL(function));
+}
+
 static int compiler_emit_jump(CompilerContext *ctx, uint8_t instruction) {
   compiler_emit_byte(ctx, instruction);
   compiler_emit_byte(ctx, 0xff);
@@ -381,6 +453,7 @@ static bool compiler_parse_special_form(CompilerContext *ctx, Token *call_token)
   case TokenKindSet: compiler_parse_set(ctx); break;
   case TokenKindLet: compiler_parse_let(ctx); break;
   case TokenKindIf: compiler_parse_if(ctx); break;
+  case TokenKindLambda: compiler_parse_lambda(ctx); break;
   default: return false; // No special form found
   }
 
@@ -390,32 +463,54 @@ static bool compiler_parse_special_form(CompilerContext *ctx, Token *call_token)
 static void compiler_parse_list(CompilerContext *ctx) {
   // Try to find the call target (this could be an expression!)
   Token call_token = ctx->parser->current;
-  compiler_advance(ctx);
+  bool is_call = false;
 
-  if (ctx->parser->current.kind == TokenKindRightParen) {
-    // Is it an empty list?  Error if not quoted
-    PANIC("Empty list!");
-  }
+  // Possibilities
+  // - Primitive command with its own opcode
+  // - Special form that has non-standard call semantics
+  // - Symbol in first position
+  // - Raw lambda in first position
+  // - Expression that evaluates to lambda
+  // In the latter 3 cases, compiler the callee before the arguments
 
-  if (compiler_parse_special_form(ctx, &call_token)) {
-    // A special form was parsed, exit here
-    return;
-  }
-
-  // Parse expressions until we reach a right paren
-  for (;;) {
-    // Compile next operand
+  // Evaluate the first expression if it's not an operator
+  if (call_token.kind == TokenKindSymbol || call_token.kind == TokenKindLeftParen) {
     compiler_parse_expr(ctx);
+    is_call = true;
+  } else {
+    compiler_advance(ctx);
+    if (compiler_parse_special_form(ctx, &call_token)) {
+      // A special form was parsed, exit here
+      return;
+    }
+  }
 
+  // Parse argument expressions until we reach a right paren
+  uint8_t arg_count = 0;
+  for (;;) {
     // Bail out when we hit the closing parentheses
     if (ctx->parser->current.kind == TokenKindRightParen) {
-      // Compile the call operator
-      compiler_parse_operator_call(ctx, &call_token);
+      if (is_call == false) {
+        // Compile the primitive operator
+        compiler_parse_operator_call(ctx, &call_token);
+      } else {
+        // Emit the call operation
+        compiler_emit_bytes(ctx, OP_CALL, arg_count);
+      }
 
       // Consume the right paren and exit
       compiler_consume(ctx, TokenKindRightParen, "Expected closing paren.");
       return;
     }
+
+    // Compile next operand
+    compiler_parse_expr(ctx);
+
+    if (arg_count == 255) {
+      compiler_error(ctx, "Cannot pass more than 255 arguments in a function call.");
+    }
+
+    arg_count++;
   }
 }
 
@@ -480,20 +575,6 @@ static void compiler_parse_expr(CompilerContext *ctx) {
   }
 }
 
-static ObjectFunction *compiler_end(CompilerContext *ctx) {
-  ObjectFunction *function = ctx->function;
-  compiler_emit_return(ctx);
-
-  #ifdef DEBUG_PRINT_CODE
-  if (!ctx->parser->had_error) {
-    mesche_disasm_chunk(&function->chunk,
-                        function->name != NULL ? function->name->chars : "<script>");
-  }
-  #endif
-
-  return function;
-}
-
 ObjectFunction *mesche_compile_source(VM *vm, const char *script_source) {
   Parser parser;
   Scanner scanner;
@@ -504,24 +585,12 @@ ObjectFunction *mesche_compile_source(VM *vm, const char *script_source) {
     .vm = vm,
     .parser = &parser,
     .scanner = &scanner,
-    .function = NULL,
-    .function_type = TYPE_SCRIPT,
-    .local_count = 0,
-    .scope_depth = 0
   };
+  compiler_init_context(&ctx, NULL, TYPE_SCRIPT);
 
   // Reset parser error state
   parser.had_error = false;
   parser.panic_mode = false;
-
-  // Establish the first local slot
-  Local *local = &ctx.locals[ctx.local_count++];
-  local->depth = 0;
-  local->name.start = "";
-  local->name.length = 0;
-
-  // Create a new function for parsing the top-level
-  ctx.function = mesche_object_make_function(vm);
 
   // Find the first legitimate token and then start parsing until
   // we reach the end of the source
