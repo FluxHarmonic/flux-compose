@@ -6,3 +6,5 @@
 
 ((lambda (a)
    (display a)) "Self invoke!")
+
+(display (clock))

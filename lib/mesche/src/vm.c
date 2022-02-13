@@ -1,3 +1,4 @@
+#include <time.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <stdarg.h>
@@ -87,6 +88,11 @@ static bool vm_call_value(VM *vm, Value callee, uint8_t arg_count) {
     switch (OBJECT_KIND(callee)) {
     case ObjectKindFunction:
       return vm_call(vm, AS_FUNCTION(callee), arg_count);
+    case ObjectKindNativeFunction:
+      FunctionPtr func_ptr = AS_NATIVE_FUNC(callee);
+      Value result = func_ptr(arg_count, vm->stack_top - arg_count);
+      vm_stack_push(vm, result);
+      return true;
     default: break; // Value not callable
     }
   }
@@ -248,6 +254,21 @@ InterpretResult mesche_vm_run(VM *vm) {
 #undef BINARY_OP
 }
 
+static Value mesche_vm_clock_native(int arg_count, Value *args) {
+  return NUMBER_VAL((double)clock() / CLOCKS_PER_SEC);
+}
+
+void mesche_vm_define_native(VM *vm, const char *name, FunctionPtr function) {
+  // Create objects for the name and the function
+  vm_stack_push(vm, OBJECT_VAL(mesche_object_make_string(vm, name, (int)strlen(name))));
+  vm_stack_push(vm, OBJECT_VAL(mesche_object_make_native_function(vm, function)));
+
+  // Add the item to the table and pop them back out
+  mesche_table_set(&vm->globals, AS_STRING(*(vm->stack_top - 2)), *(vm->stack_top - 1));
+  vm_stack_pop(vm);
+  vm_stack_pop(vm);
+}
+
 InterpretResult mesche_vm_eval_string(VM *vm, const char *script_string) {
   ObjectFunction *function = mesche_compile_source(vm, script_string);
   if (function == NULL) {
@@ -257,6 +278,9 @@ InterpretResult mesche_vm_eval_string(VM *vm, const char *script_string) {
   // Push the top-level function and call it
   vm_stack_push(vm, OBJECT_VAL(function));
   vm_call(vm, function, 0);
+
+  // Define core native functions
+  mesche_vm_define_native(vm, "clock", mesche_vm_clock_native);
 
   // Run the VM starting at the first call frame
   return mesche_vm_run(vm);

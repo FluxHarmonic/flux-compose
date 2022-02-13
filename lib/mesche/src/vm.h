@@ -10,6 +10,8 @@
 #define FRAMES_MAX 64
 #define STACK_MAX (FRAMES_MAX * UINT8_COUNT)
 
+typedef Value (*FunctionPtr)(int arg_count, Value *args);
+
 typedef struct {
   ObjectFunction *function;
   uint8_t *ip;
@@ -36,5 +38,6 @@ void mesche_vm_init(VM *vm);
 InterpretResult mesche_vm_run(VM *vm);
 void mesche_vm_free(VM *vm);
 InterpretResult mesche_vm_eval_string(VM *vm, const char *script_string);
+void mesche_vm_define_native(VM *vm, const char *name, FunctionPtr function);
 
 #endif

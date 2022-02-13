@@ -14,6 +14,9 @@
 #define IS_FUNCTION(value) object_is_kind(value, ObjectKindFunction)
 #define AS_FUNCTION(value) ((ObjectFunction *)AS_OBJECT(value))
 
+#define IS_NATIVE_FUNC(value) object_is_kind(value, ObjectKindNativeFunction)
+#define AS_NATIVE_FUNC(value) (((ObjectNativeFunction *)AS_OBJECT(value))->function)
+
 #define AS_STRING(value) ((ObjectString *)AS_OBJECT(value))
 #define AS_CSTRING(value) (((ObjectString *)AS_OBJECT(value))->chars)
 
@@ -21,7 +24,8 @@ typedef enum {
   ObjectKindString,
   ObjectKindSymbol,
   ObjectKindKeyword,
-  ObjectKindFunction
+  ObjectKindFunction,
+  ObjectKindNativeFunction
 } ObjectKind;
 
 struct Object {
@@ -56,8 +60,14 @@ struct ObjectFunction {
   ObjectString *name;
 };
 
+typedef struct {
+  Object object;
+  FunctionPtr function;
+} ObjectNativeFunction;
+
 ObjectString *mesche_object_make_string(VM *vm, const char *chars, int length);
 ObjectFunction *mesche_object_make_function(VM *vm, FunctionType type);
+ObjectFunction *mesche_object_make_native_function(VM *vm, FunctionPtr function);
 
 void mesche_object_free(struct Object *object);
 void mesche_object_print(Value value);

@@ -85,9 +85,14 @@ ObjectFunction *mesche_object_make_function(VM *vm, FunctionType type) {
   return function;
 }
 
+ObjectFunction *mesche_object_make_native_function(VM *vm, FunctionPtr function) {
+  ObjectNativeFunction *native = ALLOC_OBJECT(vm, ObjectNativeFunction, ObjectKindNativeFunction);
+  native->function = function;
+  return native;
+}
+
 void mesche_object_free(Object *object) {
   ObjectString *string = NULL;
-  ObjectFunction *function = NULL;
 
   switch (object->kind) {
   case ObjectKindString:
@@ -95,8 +100,10 @@ void mesche_object_free(Object *object) {
     FREE_SIZE(string, (sizeof(ObjectString) + string->length + 1));
     break;
   case ObjectKindFunction:
-    function = (ObjectFunction*)object;
     FREE(ObjectFunction, object);
+    break;
+  case ObjectKindNativeFunction:
+    FREE(ObjectNativeFunction, object);
     break;
   default:
     PANIC("Don't know how to free object kind %d!", object->kind);
@@ -123,6 +130,9 @@ void mesche_object_print(Value value) {
     break;
   case ObjectKindFunction:
     print_function(AS_FUNCTION(value));
+    break;
+  case ObjectKindNativeFunction:
+    printf("<native fn>");
     break;
   }
 }
