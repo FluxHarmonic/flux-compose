@@ -75,9 +75,10 @@ ObjectString *mesche_object_make_symbol(VM *vm, const char *chars, int length) {
   return string;
 }
 
-ObjectFunction *mesche_object_make_function(VM *vm) {
+ObjectFunction *mesche_object_make_function(VM *vm, FunctionType type) {
   ObjectFunction *function = ALLOC_OBJECT(vm, ObjectFunction, ObjectKindFunction);
   function->arity = 0;
+  function->type = type;
   function->name = NULL;
   mesche_chunk_init(&function->chunk);
 
@@ -104,11 +105,15 @@ void mesche_object_free(Object *object) {
 
 static void print_function(ObjectFunction *function) {
   if (function->name == NULL) {
-    printf("<script>");
+    if (function->type == TYPE_SCRIPT) {
+      printf("<script 0x%x>", function);
+    } else {
+      printf("<lambda 0x%x>", function);
+    }
     return;
   }
 
-  printf("<fn %s>", function->name->chars);
+  printf("<fn %s 0x%x>", function->name->chars, function);
 }
 
 void mesche_object_print(Value value) {

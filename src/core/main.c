@@ -36,6 +36,7 @@ int main(int argc, char **argv) {
     VM vm;
     mesche_vm_init(&vm);
     mesche_vm_eval_string(&vm, script_source);
+    printf("\n");
 
     // Free the VM and allocated source string
     mesche_vm_free(&vm);

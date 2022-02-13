@@ -2,6 +2,7 @@
 
 #include "op.h"
 #include "value.h"
+#include "object.h"
 #include "chunk.h"
 
 int mesche_disasm_simple_instr(const char *name, int offset) {
@@ -88,16 +89,20 @@ int mesche_disasm_instr(Chunk *chunk, int offset) {
     return mesche_disasm_jump_instr("OP_JUMP", 1, chunk, offset);
   case OP_JUMP_IF_FALSE:
     return mesche_disasm_jump_instr("OP_JUMP_IF_FALSE", 1, chunk, offset);
+  case OP_CALL:
+    return mesche_disasm_byte_instr("OP_CALL", chunk, offset);
   default:
     printf("Unknown opcode: %d\n", instr);
     return offset + 1;
   }
 }
 
-void mesche_disasm_chunk(Chunk *chunk, const char *name) {
-  printf("== %s ==\n", name);
+void mesche_disasm_function(ObjectFunction *function) {
+  printf("== ");
+  mesche_object_print(OBJECT_VAL(function));
+  printf(" ==\n");
 
-  for (int offset = 0; offset < chunk->count; /* Intentionally empty */) {
-    offset = mesche_disasm_instr(chunk, offset);
+  for (int offset = 0; offset < function->chunk.count; /* Intentionally empty */) {
+    offset = mesche_disasm_instr(&function->chunk, offset);
   }
 }
