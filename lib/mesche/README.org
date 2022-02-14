@@ -1,0 +1,36 @@
+#+title: Mesche Compiler
+
+Mesche is a programming language that is designed for integration in C applications.
+
+Its primary use is as a high-performance scripting language to drive C applications and enable interactive development of behavior.  The compiler and runtime can be compiled directly into the C application so that this interactivity is available even in shipped applications.
+
+* Goals
+
+- Simplicity: The compiler and runtime should be easy to understand and debug.
+- Extensible: The language will be extensible through macros and Mesche modules and also through easy registration of C functions into the runtime.
+- Useful: Provides tools to build C/C++ projects that use Mesche (`mesche build`) and also manage project dependencies, especially those containing Mesche modules.
+
+* Should I use this?
+
+This project is in a very early stage of development, it's not ready for general use.  However, if you find the idea interesting and would like to try it, I would certainly be happy to have your feedback!
+
+* Features
+
+- Compiles directly to bytecode running on a custom VM
+- First-class functions with closures
+- Native function registration for integrating with C APIs
+- Supports running a VM per OS thread
+
+* Future Features
+
+- Unhygenic (and possibly hygenic) macro definitions
+- Defining code in modules that can be loaded into Mesche projects
+- Defining structure types in Mesche
+- Automatic generation of bindings to C functions and structures by reading in C headers
+- APIs for working with dynamic arrays of C structures
+- Cross-platform build orchestration, dependency management, and release builds with =mesche build=
+- /Maybe/ support for continuations if doesn't complicate the compiler design significantly
+
+* License
+
+This project is licensed under the [[file:LICENSE][BSD 3-Clause License]].
