@@ -1,9 +1,9 @@
-#include <flux-internal.h>
 #include <ctype.h>
+#include <flux-internal.h>
 #include <flux.h>
+#include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
-#include <stdarg.h>
 #include <string.h>
 
 void *script_value_buffer = NULL;
@@ -552,8 +552,8 @@ ValueHeader *flux_script_eval_expr(ExprHeader *expr) {
 
       if (strcmp(symbol_name, "add") == 0) {
         return flux_script_func_add(&arg_cursor, &value_cursor);
-      } else if (strcmp(symbol_name, "show-preview-window") == 0) {
-        return flux_graphics_func_show_preview_window(&arg_cursor, &value_cursor);
+        /* } else if (strcmp(symbol_name, "show-preview-window") == 0) { */
+        /*   return flux_graphics_func_show_preview_window(&arg_cursor, &value_cursor); */
       } else if (strcmp(symbol_name, "circle") == 0) {
         return flux_graphics_func_circle(&arg_cursor, &value_cursor);
       }

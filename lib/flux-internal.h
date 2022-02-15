@@ -139,8 +139,6 @@ extern ValueHeader *flux_script_eval_expr(ExprHeader *expr);
 
 // Graphics -------------------------------------------
 
-extern ValueHeader *flux_graphics_func_show_preview_window(VectorCursor *list_cursor,
-                                                           ValueCursor *value_cursor);
 extern ValueHeader *flux_graphics_func_circle(VectorCursor *list_cursor, ValueCursor *value_cursor);
 
 // Texture -------------------------------------------

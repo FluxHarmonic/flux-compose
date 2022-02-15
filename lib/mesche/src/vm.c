@@ -1,17 +1,17 @@
-#include <time.h>
-#include <stdio.h>
-#include <stdint.h>
 #include <stdarg.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <time.h>
 
-#include "vm.h"
-#include "compiler.h"
-#include "op.h"
-#include "mem.h"
-#include "util.h"
 #include "chunk.h"
-#include "value.h"
+#include "compiler.h"
 #include "disasm.h"
+#include "mem.h"
 #include "object.h"
+#include "op.h"
+#include "util.h"
+#include "value.h"
+#include "vm.h"
 
 // NOTE: Enable this for diagnostic purposes
 /* #define DEBUG_TRACE_EXECUTION */
@@ -94,12 +94,14 @@ static bool vm_call_value(VM *vm, Value callee, uint8_t arg_count) {
     switch (OBJECT_KIND(callee)) {
     case ObjectKindClosure:
       return vm_call(vm, AS_CLOSURE(callee), arg_count);
-    case ObjectKindNativeFunction:
+    case ObjectKindNativeFunction: {
       FunctionPtr func_ptr = AS_NATIVE_FUNC(callee);
       Value result = func_ptr(arg_count, vm->stack_top - arg_count);
       vm_stack_push(vm, result);
       return true;
-    default: break; // Value not callable
+    }
+    default:
+      break; // Value not callable
     }
   }
 
@@ -165,29 +167,30 @@ InterpretResult mesche_vm_run(VM *vm) {
 #define READ_STRING() AS_STRING(READ_CONSTANT())
 
 // TODO: Don't pop 'a', manipulate top of stack
-#define BINARY_OP(value_type, pred, cast, op)   \
-  do { \
-    if (!pred(vm_stack_peek(vm, 0)) || !pred(vm_stack_peek(vm, 1))) { \
-      vm_runtime_error(vm, "Operands must be numbers.");                 \
-      return INTERPRET_RUNTIME_ERROR; \
-    } \
-    double b = cast(vm_stack_pop(vm));      \
-    double a = cast(vm_stack_pop(vm));      \
-    vm_stack_push(vm, value_type(a op b));       \
+#define BINARY_OP(value_type, pred, cast, op)                                                      \
+  do {                                                                                             \
+    if (!pred(vm_stack_peek(vm, 0)) || !pred(vm_stack_peek(vm, 1))) {                              \
+      vm_runtime_error(vm, "Operands must be numbers.");                                           \
+      return INTERPRET_RUNTIME_ERROR;                                                              \
+    }                                                                                              \
+    double b = cast(vm_stack_pop(vm));                                                             \
+    double a = cast(vm_stack_pop(vm));                                                             \
+    vm_stack_push(vm, value_type(a op b));                                                         \
   } while (false)
 
   for (;;) {
-    #ifdef DEBUG_TRACE_EXECUTION
+#ifdef DEBUG_TRACE_EXECUTION
     printf(" ");
-    for (Value* slot = vm->stack; slot < vm->stack_top; slot++) {
+    for (Value *slot = vm->stack; slot < vm->stack_top; slot++) {
       printf("[ ");
       mesche_value_print(*slot);
       printf(" ]");
     }
     printf("\n");
 
-    mesche_disasm_instr(&frame->closure->function->chunk, (int)(frame->ip - frame->closure->function->chunk.code));
-    #endif
+    mesche_disasm_instr(&frame->closure->function->chunk,
+                        (int)(frame->ip - frame->closure->function->chunk.code));
+#endif
 
     uint8_t instr;
     uint8_t offset;
@@ -202,9 +205,15 @@ InterpretResult mesche_vm_run(VM *vm) {
       value = READ_CONSTANT();
       vm_stack_push(vm, value);
       break;
-    case OP_NIL: vm_stack_push(vm, NIL_VAL); break;
-    case OP_T: vm_stack_push(vm, T_VAL); break;
-    case OP_POP: vm_stack_pop(vm); break;
+    case OP_NIL:
+      vm_stack_push(vm, NIL_VAL);
+      break;
+    case OP_T:
+      vm_stack_push(vm, T_VAL);
+      break;
+    case OP_POP:
+      vm_stack_pop(vm);
+      break;
     case OP_POP_SCOPE: {
       // Only start popping if we have locals to clear
       uint8_t local_count = READ_BYTE();
@@ -217,13 +226,27 @@ InterpretResult mesche_vm_run(VM *vm) {
       }
       break;
     }
-    case OP_ADD: BINARY_OP(NUMBER_VAL, IS_NUMBER, AS_NUMBER, +); break;
-    case OP_SUBTRACT: BINARY_OP(NUMBER_VAL, IS_NUMBER, AS_NUMBER, -); break;
-    case OP_MULTIPLY: BINARY_OP(NUMBER_VAL, IS_NUMBER, AS_NUMBER, *); break;
-    case OP_DIVIDE: BINARY_OP(NUMBER_VAL, IS_NUMBER, AS_NUMBER, /); break;
-    case OP_AND: BINARY_OP(BOOL_VAL, IS_ANY, AS_BOOL, &&); break;
-    case OP_OR: BINARY_OP(BOOL_VAL, IS_ANY, AS_BOOL, ||); break;
-    case OP_NOT: vm_stack_push(vm, IS_NIL(vm_stack_pop(vm)) ? T_VAL : NIL_VAL); break;
+    case OP_ADD:
+      BINARY_OP(NUMBER_VAL, IS_NUMBER, AS_NUMBER, +);
+      break;
+    case OP_SUBTRACT:
+      BINARY_OP(NUMBER_VAL, IS_NUMBER, AS_NUMBER, -);
+      break;
+    case OP_MULTIPLY:
+      BINARY_OP(NUMBER_VAL, IS_NUMBER, AS_NUMBER, *);
+      break;
+    case OP_DIVIDE:
+      BINARY_OP(NUMBER_VAL, IS_NUMBER, AS_NUMBER, /);
+      break;
+    case OP_AND:
+      BINARY_OP(BOOL_VAL, IS_ANY, AS_BOOL, &&);
+      break;
+    case OP_OR:
+      BINARY_OP(BOOL_VAL, IS_ANY, AS_BOOL, ||);
+      break;
+    case OP_NOT:
+      vm_stack_push(vm, IS_NIL(vm_stack_pop(vm)) ? T_VAL : NIL_VAL);
+      break;
     case OP_EQUAL:
       // Drop through for now
     case OP_EQV: {
@@ -293,7 +316,7 @@ InterpretResult mesche_vm_run(VM *vm) {
       break;
     case OP_SET_GLOBAL:
       name = READ_STRING();
-      if(mesche_table_set(&vm->globals, name, vm_stack_peek(vm, 0))) {
+      if (mesche_table_set(&vm->globals, name, vm_stack_peek(vm, 0))) {
         vm_runtime_error(vm, "Undefined variable '%s'.", name->chars);
         return INTERPRET_RUNTIME_ERROR;
       }
@@ -358,7 +381,8 @@ InterpretResult mesche_vm_run(VM *vm) {
     // TODO: Rethink this check, it doesn't work for binary operations which
     // pop 2 values from the stack
     /* if (instr != OP_POP && vm->stack_top < prev_stack_top) { */
-    /*   PANIC("Instruction \"%d\" consumed a stack value! (before: %x, after: %x)\n", instr, prev_stack_top, vm->stack_top); */
+    /*   PANIC("Instruction \"%d\" consumed a stack value! (before: %x, after: %x)\n", instr,
+     * prev_stack_top, vm->stack_top); */
     /* } */
   }
 

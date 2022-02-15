@@ -1,10 +1,10 @@
 #include "app.h"
 #include <flux.h>
+#include <mesche.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdbool.h>
 #include <string.h>
-#include <mesche.h>
 
 int main(int argc, char **argv) {
   bool use_repl = false;
@@ -31,10 +31,15 @@ int main(int argc, char **argv) {
     flux_repl_start_stdin();
   } else if (script_source != NULL) {
     // Evaluate the script
-    //flux_script_eval(script_file);
-    /* flux_script_compile(script_file); */
     VM vm;
     mesche_vm_init(&vm);
+
+    // Register some native functions
+    mesche_vm_define_native(&vm, "show-preview-window", flux_graphics_func_show_preview_window);
+    mesche_vm_define_native(&vm, "render-to-file", flux_graphics_func_render_to_file);
+    mesche_vm_define_native(&vm, "flux-harmonic-thumbnail",
+                            flux_graphics_func_flux_harmonic_thumbnail);
+
     mesche_vm_eval_string(&vm, script_source);
     printf("\n");
 

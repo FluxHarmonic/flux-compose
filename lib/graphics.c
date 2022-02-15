@@ -6,9 +6,13 @@
 #include <glad/glad.h>
 #include <inttypes.h>
 #include <math.h>
+#include <mesche.h>
 #include <pthread.h>
 #include <stdlib.h>
 #include <string.h>
+
+static char output_image_path[1024];
+static char flux_thumbnail_str[100];
 
 // model: affecting the shape and translation of the object
 // view: affecting the position of the camera, possibly scale (make camera lens bigger/smaller)
@@ -402,8 +406,8 @@ void flux_graphics_save_to_png(FluxWindow window, const char *output_file_path) 
   size_t image_row_length = 4 * *window->width;
   size_t image_data_size = sizeof(*image_bytes) * image_row_length * *window->height;
 
-  flux_log("Rendering window of size %u / %u to file: %s\n", *window->width, *window->height,
-           output_file_path);
+  /* flux_log("Rendering window of size %u / %u to file: %s\n", *window->width, *window->height, */
+  /*          output_file_path); */
 
   // Allocate storage for the screen bytes
   // TODO: reduce memory allocation requirements
@@ -532,13 +536,13 @@ void flux_graphics_render_thumbnail(FluxRenderContext context) {
 
   // Draw some text if the font got loaded
   if (jost_font) {
-    flux_font_draw_text(context, jost_font, "February 10, 2022", 465,
+    flux_font_draw_text(context, jost_font, flux_thumbnail_str, 465,
                         context->desired_size[1] - 150);
   }
 }
 
 void *flux_graphics_render_loop(void *arg) {
-  int has_saved = 0; // TODO: Remove this hack!
+  float amt, scale;
   FluxWindow window = arg;
   FluxRenderContext context = &window->context;
   GLFWwindow *glfwWindow = window->glfwWindow;
@@ -600,14 +604,18 @@ void *flux_graphics_render_loop(void *arg) {
      * 0.0, 1.0 }); */
 
     // Render the test scene
-    flux_graphics_render_test(context);
-    /* flux_graphics_render_thumbnail(context); */
+    if (flux_thumbnail_str[0] != '\0') {
+      flux_graphics_render_thumbnail(context);
+    } else {
+      flux_graphics_render_test(context);
+    }
 
     // Render the screen to a file once
     // TODO: Remove this!
-    if (has_saved == 0) {
-      flux_graphics_save_to_png(window, "output.png");
-      has_saved = 1;
+    if (output_image_path[0] != '\0') {
+      flux_log("Saving image to path: %s\n", output_image_path);
+      flux_graphics_save_to_png(window, output_image_path);
+      output_image_path[0] = '\0';
     }
 
     // Swap the render buffers
@@ -667,18 +675,44 @@ void flux_graphics_end(void) {
   glfwTerminate();
 }
 
-ValueHeader *flux_graphics_func_show_preview_window(VectorCursor *list_cursor,
-                                                    ValueCursor *value_cursor) {
-  // TODO: Extract width and height parmeters
+Value flux_graphics_func_show_preview_window(int arg_count, Value *args) {
+  if (arg_count != 2) {
+    flux_log("Function requires 2 number parameters.");
+  }
+
+  int width = AS_NUMBER(args[0]);
+  int height = AS_NUMBER(args[1]);
+
+  flux_log("Creating preview window (width: %d / height: %d)\n", width, height);
 
   if (preview_window == NULL) {
     // Start the loop and wait until it finishes
     flux_graphics_init();
-    preview_window = flux_graphics_window_create(2500, 1408, "Flux Compose");
+    preview_window = flux_graphics_window_create(width, height, "Flux Compose");
     flux_graphics_window_show(preview_window);
     flux_graphics_loop_start(preview_window);
   }
 
   // TODO: Return preview_window as a pointer
-  return NULL;
+  return T_VAL;
+}
+
+Value flux_graphics_func_render_to_file(int arg_count, Value *args) {
+  if (arg_count != 1) {
+    flux_log("Function requires a path to the output file.");
+  }
+
+  char *file_path = AS_CSTRING(args[0]);
+  flux_log("Received request to save image: %s\n", file_path);
+  memcpy(output_image_path, file_path, strlen(file_path));
+}
+
+Value flux_graphics_func_flux_harmonic_thumbnail(int arg_count, Value *args) {
+  if (arg_count != 1) {
+    flux_log("Function requires a string for the date.");
+  }
+
+  char *date_str = AS_CSTRING(args[0]);
+  flux_log("Received request to render thumbnail: %s\n", date_str);
+  memcpy(flux_thumbnail_str, date_str, strlen(date_str));
 }

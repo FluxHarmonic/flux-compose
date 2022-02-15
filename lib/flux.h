@@ -4,6 +4,7 @@
 #define GLFW_INCLUDE_NONE
 #include <glad/glad.h>
 #include <inttypes.h>
+#include <mesche.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -101,6 +102,10 @@ extern void flux_graphics_draw_texture_ex(FluxRenderContext context, FluxTexture
 
 extern GLuint flux_graphics_shader_compile(const FluxShaderFile *shader_files,
                                            uint32_t shader_count);
+
+Value flux_graphics_func_show_preview_window(int arg_count, Value *args);
+Value flux_graphics_func_render_to_file(int arg_count, Value *args);
+Value flux_graphics_func_flux_harmonic_thumbnail(int arg_count, Value *args);
 
 // Shaders ---------------------------------------
 

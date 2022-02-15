@@ -1,0 +1,3 @@
+(show-preview-window 2500 1406)
+(flux-harmonic-thumbnail "February 17, 2022")
+(render-to-file "thumbnail.png")
