@@ -1,9 +1,13 @@
 #ifndef mesche_value_h
 #define mesche_value_h
 
+// Typedef some object types here to deal with circular dependency
+// issues between vm.h, value.h, and object.h.
 typedef struct Object Object;
 typedef struct ObjectString ObjectString;
 typedef struct ObjectFunction ObjectFunction;
+typedef struct ObjectClosure ObjectClosure;
+typedef struct ObjectUpvalue ObjectUpvalue;
 
 #include <stdbool.h>
 

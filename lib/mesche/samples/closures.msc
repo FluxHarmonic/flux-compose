@@ -1,0 +1,11 @@
+(define outer
+  (lambda ()
+    (let ((x "Go! "))
+      (lambda ()
+        (display x)))))
+
+(define inner (outer))
+
+(inner)
+(inner)
+(inner)

@@ -51,6 +51,8 @@ int mesche_disasm_instr(Chunk *chunk, int offset) {
     return mesche_disasm_simple_instr("OP_T", offset);
   case OP_POP:
     return mesche_disasm_simple_instr("OP_POP", offset);
+  case OP_POP_SCOPE:
+    return mesche_disasm_byte_instr("OP_POP_SCOPE", chunk, offset);
   case OP_ADD:
     return mesche_disasm_simple_instr("OP_ADD", offset);
   case OP_SUBTRACT:
@@ -79,6 +81,10 @@ int mesche_disasm_instr(Chunk *chunk, int offset) {
     return mesche_disasm_const_instr("OP_DEFINE_GLOBAL", chunk, offset);
   case OP_READ_GLOBAL:
     return mesche_disasm_const_instr("OP_READ_GLOBAL", chunk, offset);
+  case OP_READ_UPVALUE:
+    return mesche_disasm_byte_instr("OP_READ_UPVALUE", chunk, offset);
+  case OP_SET_UPVALUE:
+    return mesche_disasm_byte_instr("OP_SET_UPVALUE", chunk, offset);
   case OP_SET_GLOBAL:
     return mesche_disasm_const_instr("OP_SET_GLOBAL", chunk, offset);
   case OP_READ_LOCAL:
@@ -91,6 +97,25 @@ int mesche_disasm_instr(Chunk *chunk, int offset) {
     return mesche_disasm_jump_instr("OP_JUMP_IF_FALSE", 1, chunk, offset);
   case OP_CALL:
     return mesche_disasm_byte_instr("OP_CALL", chunk, offset);
+  case OP_CLOSURE: {
+    offset++;
+    uint8_t constant = chunk->code[offset++];
+    printf("%-16s  %4d  ", "OP_CLOSURE", constant);
+    mesche_value_print(chunk->constants.values[constant]);
+    printf("\n");
+
+    // Disassemble the local and upvalue references
+    ObjectFunction *function = AS_FUNCTION(chunk->constants.values[constant]);
+    for (int j = 0; j < function->upvalue_count; j++) {
+      int is_local = chunk->code[offset++];
+      int index = chunk->code[offset++];
+      printf("%04d | %s %d\n", offset - 2, is_local ? "local" : "upvalue", index);
+    }
+
+    return offset;
+  }
+  case OP_CLOSE_UPVALUE:
+    return mesche_disasm_simple_instr("OP_CLOSE_UPVALUE", offset);
   default:
     printf("Unknown opcode: %d\n", instr);
     return offset + 1;

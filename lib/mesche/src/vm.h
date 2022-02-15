@@ -13,7 +13,7 @@
 typedef Value (*FunctionPtr)(int arg_count, Value *args);
 
 typedef struct {
-  ObjectFunction *function;
+  ObjectClosure *closure;
   uint8_t *ip;
   Value *slots;
 } CallFrame;
@@ -25,6 +25,7 @@ typedef struct {
   Value *stack_top;
   Table strings;
   Table globals;
+  ObjectUpvalue *open_upvalues;
   Object *objects;
 } VM;
 
