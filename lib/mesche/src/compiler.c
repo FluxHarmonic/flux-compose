@@ -26,7 +26,13 @@ typedef struct {
 typedef struct {
   Token name;
   int depth;
+  bool is_captured;
 } Local;
+
+typedef struct {
+  uint8_t index;
+  bool is_local;
+} Upvalue;
 
 typedef struct CompilerContext {
   struct CompilerContext *parent;
@@ -41,6 +47,7 @@ typedef struct CompilerContext {
   Local locals[UINT8_COUNT];
   int local_count;
   int scope_depth;
+  Upvalue upvalues[UINT8_COUNT];
 } CompilerContext;
 
 static void compiler_init_context(CompilerContext *ctx, CompilerContext *parent, FunctionType type) {
@@ -61,6 +68,7 @@ static void compiler_init_context(CompilerContext *ctx, CompilerContext *parent,
   // Establish the first local slot
   Local *local = &ctx->locals[ctx->local_count++];
   local->depth = 0;
+  local->is_captured = false;
   local->name.start = "";
   local->name.length = 0;
 }
@@ -190,6 +198,7 @@ static void compiler_add_local(CompilerContext *ctx, Token name) {
   Local *local = &ctx->locals[ctx->local_count++];
   local->name = name; // No need to copy, will only be used during compilation
   local->depth = -1; // The variable is uninitialized until assigned
+  local->is_captured = false;
 }
 
 static int compiler_resolve_local(CompilerContext *ctx, Token *name) {
@@ -204,6 +213,47 @@ static int compiler_resolve_local(CompilerContext *ctx, Token *name) {
     }
   }
 
+  return -1;
+}
+
+static int compiler_add_upvalue(CompilerContext *ctx, uint8_t index, bool is_local) {
+  // Can we reuse an existing upvalue?
+  int upvalue_count = ctx->function->upvalue_count;
+  for (int i = 0; i < upvalue_count; i++) {
+    Upvalue *upvalue = &ctx->upvalues[i];
+    if (upvalue->index == index && upvalue->is_local == is_local) {
+      return i;
+    }
+  }
+
+  if (upvalue_count == UINT8_COUNT) {
+    compiler_error(ctx, "Reached the limit of closures captured in one function.");
+  }
+
+  // Initialize the next upvalue slot
+  ctx->upvalues[upvalue_count].is_local = is_local;
+  ctx->upvalues[upvalue_count].index = index;
+  return ctx->function->upvalue_count++;
+}
+
+static int compiler_resolve_upvalue(CompilerContext *ctx, Token *name) {
+  // If there's no parent context then there's nothing to close over
+  if (ctx->parent == NULL) return -1;
+
+  // First try to resolve the variable as a local in the parent
+  int local = compiler_resolve_local(ctx->parent, name);
+  if (local != -1) {
+    ctx->parent->locals[local].is_captured = true;
+    return compiler_add_upvalue(ctx, (uint8_t)local, true);
+  }
+
+  // If we didn't find a local, look for a binding from a parent scope
+  int upvalue = compiler_resolve_upvalue(ctx->parent, name);
+  if (upvalue != -1) {
+    return compiler_add_upvalue(ctx, (uint8_t)upvalue, false);
+  }
+
+  // No local or upvalue to bind to, assume global
   return -1;
 }
 
@@ -256,6 +306,9 @@ static void compiler_parse_identifier(CompilerContext *ctx) {
   int local_index = compiler_resolve_local(ctx, &ctx->parser->previous);
   if (local_index != -1) {
     compiler_emit_bytes(ctx, OP_READ_LOCAL, (uint8_t)local_index);
+  } else if ((local_index = compiler_resolve_upvalue(ctx, &ctx->parser->previous)) != -1) {
+    // Found an upvalue
+    compiler_emit_bytes(ctx, OP_READ_UPVALUE, (uint8_t)local_index);
   } else {
     uint8_t variable_constant = compiler_parse_symbol(ctx);
     compiler_emit_bytes(ctx, OP_READ_GLOBAL, variable_constant);
@@ -294,6 +347,8 @@ static void compiler_parse_set(CompilerContext *ctx) {
   if (arg == -1) {
     arg = compiler_parse_symbol(ctx);
     instr = OP_SET_GLOBAL;
+  } else if ((arg = compiler_resolve_upvalue(ctx, &ctx->parser->previous)) != -1) {
+    instr = OP_SET_UPVALUE;
   }
 
   compiler_parse_expr(ctx);
@@ -307,13 +362,22 @@ static void compiler_begin_scope(CompilerContext *ctx) {
 }
 
 static void compiler_end_scope(CompilerContext *ctx) {
-  // Pop all local variables from the previous scope
-  // TODO: Count the variables to pop and send it in one OP_POPN
+  // Pop all local variables from the previous scope while closing any upvalues
+  // that have been captured inside of it
   ctx->scope_depth--;
+  uint8_t local_count = 0;
   while (ctx->local_count > 0 && ctx->locals[ctx->local_count - 1].depth > ctx->scope_depth) {
-    compiler_emit_byte(ctx, OP_POP);
+    local_count++;
+    if (ctx->locals[ctx->local_count - 1].is_captured) {
+      compiler_emit_byte(ctx, OP_CLOSE_UPVALUE);
+    } else {
+      compiler_emit_bytes(ctx, OP_POP_SCOPE, 1);
+    }
     ctx->local_count--;
   }
+
+  // Pop all of the locals off of the scope, retaining the final expression result
+  compiler_emit_bytes(ctx, OP_POP_SCOPE, local_count);
 }
 
 static void compiler_parse_let(CompilerContext *ctx) {
@@ -376,7 +440,13 @@ static void compiler_parse_lambda(CompilerContext *ctx) {
 
   // Get the parsed function and store it in a constant
   ObjectFunction *function = compiler_end(&func_ctx);
-  compiler_emit_constant(ctx, OBJECT_VAL(function));
+  compiler_emit_bytes(ctx, OP_CLOSURE, compiler_make_constant(ctx, OBJECT_VAL(function)));
+
+  // Write out the references to each upvalue as arguments to OP_CLOSURE
+  for (int i = 0; i < function->upvalue_count; i++) {
+    compiler_emit_byte(ctx, func_ctx.upvalues[i].is_local ? 1 : 0);
+    compiler_emit_byte(ctx, func_ctx.upvalues[i].index);
+  }
 }
 
 static int compiler_emit_jump(CompilerContext *ctx, uint8_t instruction) {

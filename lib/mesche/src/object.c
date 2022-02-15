@@ -5,6 +5,9 @@
 #include "util.h"
 #include "object.h"
 
+#define ALLOC(vm, type, count) \
+  (type)mesche_mem_realloc(NULL, 0, sizeof(type) * count)
+
 #define ALLOC_OBJECT(vm, type, object_kind)            \
   (type *)object_allocate(vm, sizeof(type), object_kind)
 
@@ -75,9 +78,18 @@ ObjectString *mesche_object_make_symbol(VM *vm, const char *chars, int length) {
   return string;
 }
 
+ObjectUpvalue *mesche_object_make_upvalue(VM *vm, Value *slot) {
+  ObjectUpvalue *upvalue = ALLOC_OBJECT(vm, ObjectUpvalue, ObjectKindUpvalue);
+  upvalue->location = slot;
+  upvalue->next = NULL;
+  upvalue->closed = NIL_VAL;
+  return upvalue;
+}
+
 ObjectFunction *mesche_object_make_function(VM *vm, FunctionType type) {
   ObjectFunction *function = ALLOC_OBJECT(vm, ObjectFunction, ObjectKindFunction);
   function->arity = 0;
+  function->upvalue_count = 0;
   function->type = type;
   function->name = NULL;
   mesche_chunk_init(&function->chunk);
@@ -85,7 +97,21 @@ ObjectFunction *mesche_object_make_function(VM *vm, FunctionType type) {
   return function;
 }
 
-ObjectFunction *mesche_object_make_native_function(VM *vm, FunctionPtr function) {
+ObjectClosure *mesche_object_make_closure(VM *vm, ObjectFunction *function) {
+  // Allocate upvalues for this closure instance
+  ObjectUpvalue **upvalues = ALLOC(vm, ObjectUpvalue*, function->upvalue_count);
+  for (int i = 0; i < function->upvalue_count; i++) {
+    upvalues[i] = NULL;
+  }
+
+  ObjectClosure *closure = ALLOC_OBJECT(vm, ObjectClosure, ObjectKindClosure);
+  closure->function = function;
+  closure->upvalues = upvalues;
+  closure->upvalue_count = function->upvalue_count;
+  return closure;
+}
+
+ObjectNativeFunction *mesche_object_make_native_function(VM *vm, FunctionPtr function) {
   ObjectNativeFunction *native = ALLOC_OBJECT(vm, ObjectNativeFunction, ObjectKindNativeFunction);
   native->function = function;
   return native;
@@ -99,7 +125,15 @@ void mesche_object_free(Object *object) {
     string = (ObjectString*)object;
     FREE_SIZE(string, (sizeof(ObjectString) + string->length + 1));
     break;
+  case ObjectKindUpvalue:
+    FREE(ObjectUpvalue, object);
+    break;
   case ObjectKindFunction:
+    FREE(ObjectFunction, object);
+    break;
+  case ObjectKindClosure:
+    ObjectClosure *closure = (ObjectClosure*)object;
+    FREE_ARRAY(ObjectUpvalue *, closure->upvalues, closure->upvalue_count);
     FREE(ObjectFunction, object);
     break;
   case ObjectKindNativeFunction:
@@ -128,8 +162,14 @@ void mesche_object_print(Value value) {
   case ObjectKindString:
     printf("%s", AS_CSTRING(value));
     break;
+  case ObjectKindUpvalue:
+    printf("upvalue");
+    break;
   case ObjectKindFunction:
     print_function(AS_FUNCTION(value));
+    break;
+  case ObjectKindClosure:
+    print_function(AS_CLOSURE(value)->function);
     break;
   case ObjectKindNativeFunction:
     printf("<native fn>");

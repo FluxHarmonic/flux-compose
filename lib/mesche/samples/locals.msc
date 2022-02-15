@@ -5,3 +5,6 @@
 
   (display " // Division: ")
   (display (/ b a)))
+
+(display "Testing return of let: ")
+(display (let ((a 4) (b 7)) 5))

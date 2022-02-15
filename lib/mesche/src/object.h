@@ -14,6 +14,9 @@
 #define IS_FUNCTION(value) object_is_kind(value, ObjectKindFunction)
 #define AS_FUNCTION(value) ((ObjectFunction *)AS_OBJECT(value))
 
+#define IS_CLOSURE(value) object_is_kind(value, ObjectKindClosure)
+#define AS_CLOSURE(value) ((ObjectClosure *)AS_OBJECT(value))
+
 #define IS_NATIVE_FUNC(value) object_is_kind(value, ObjectKindNativeFunction)
 #define AS_NATIVE_FUNC(value) (((ObjectNativeFunction *)AS_OBJECT(value))->function)
 
@@ -24,7 +27,9 @@ typedef enum {
   ObjectKindString,
   ObjectKindSymbol,
   ObjectKindKeyword,
+  ObjectKindUpvalue,
   ObjectKindFunction,
+  ObjectKindClosure,
   ObjectKindNativeFunction
 } ObjectKind;
 
@@ -56,8 +61,23 @@ struct ObjectFunction {
   Object object;
   FunctionType type;
   int arity;
+  int upvalue_count;
   Chunk chunk;
   ObjectString *name;
+};
+
+struct ObjectUpvalue {
+  Object object;
+  Value *location;
+  Value closed;
+  struct ObjectUpvalue *next;
+};
+
+struct ObjectClosure {
+  Object object;
+  ObjectFunction *function;
+  ObjectUpvalue **upvalues;
+  int upvalue_count;
 };
 
 typedef struct {
@@ -66,8 +86,10 @@ typedef struct {
 } ObjectNativeFunction;
 
 ObjectString *mesche_object_make_string(VM *vm, const char *chars, int length);
+ObjectUpvalue *mesche_object_make_upvalue(VM *vm, Value *slot);
 ObjectFunction *mesche_object_make_function(VM *vm, FunctionType type);
-ObjectFunction *mesche_object_make_native_function(VM *vm, FunctionPtr function);
+ObjectClosure *mesche_object_make_closure(VM *vm, ObjectFunction *function);
+ObjectNativeFunction *mesche_object_make_native_function(VM *vm, FunctionPtr function);
 
 void mesche_object_free(struct Object *object);
 void mesche_object_print(Value value);
