@@ -24,6 +24,9 @@ jobs:
       - name: Test
         run: ./build/run-tests
 
+      - name: Test Mesche Examples
+        run: find lib/mesche/samples -type f -print -exec ./build/flux-compose "{}" \;
+
       - name: Archive workflow results
         uses: actions/upload-artifact@v2
         with:
