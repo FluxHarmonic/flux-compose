@@ -2,15 +2,15 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "vm.h"
-#include "mem.h"
-#include "op.h"
-#include "util.h"
 #include "chunk.h"
-#include "disasm.h"
-#include "object.h"
-#include "scanner.h"
 #include "compiler.h"
+#include "disasm.h"
+#include "mem.h"
+#include "object.h"
+#include "op.h"
+#include "scanner.h"
+#include "util.h"
+#include "vm.h"
 
 #define UINT8_COUNT (UINT8_MAX + 1)
 
@@ -58,15 +58,16 @@ typedef struct CompilerContext {
 } CompilerContext;
 
 void mesche_compiler_mark_roots(void *target) {
-  CompilerContext *ctx = (CompilerContext*)target;
+  CompilerContext *ctx = (CompilerContext *)target;
 
   while (ctx != NULL) {
-    mesche_mem_mark_object(ctx->vm, (Object*)ctx->function);
+    mesche_mem_mark_object(ctx->vm, (Object *)ctx->function);
     ctx = ctx->parent;
   }
 }
 
-static void compiler_init_context(CompilerContext *ctx, CompilerContext *parent, FunctionType type) {
+static void compiler_init_context(CompilerContext *ctx, CompilerContext *parent,
+                                  FunctionType type) {
   if (parent != NULL) {
     ctx->parent = parent;
     ctx->vm = parent->vm;
@@ -111,11 +112,11 @@ static ObjectFunction *compiler_end(CompilerContext *ctx) {
   ObjectFunction *function = ctx->function;
   compiler_emit_return(ctx);
 
-  #ifdef DEBUG_PRINT_CODE
+#ifdef DEBUG_PRINT_CODE
   if (!ctx->parser->had_error) {
     mesche_disasm_function(function);
   }
-  #endif
+#endif
 
   return function;
 }
@@ -137,7 +138,8 @@ static void compiler_emit_constant(CompilerContext *ctx, Value value) {
 
 static void compiler_error_at_token(CompilerContext *ctx, Token *token, const char *message) {
   // If we're already in panic mode, ignore errors to avoid spam
-  if (ctx->parser->panic_mode) return;
+  if (ctx->parser->panic_mode)
+    return;
 
   // Turn on panic mode until we resynchronize
   ctx->parser->panic_mode = true;
@@ -170,7 +172,8 @@ static void compiler_advance(CompilerContext *ctx) {
   for (;;) {
     ctx->parser->current = mesche_scanner_next_token(ctx->scanner);
     // Consume tokens until we hit a non-error token
-    if (ctx->parser->current.kind != TokenKindError) break;
+    if (ctx->parser->current.kind != TokenKindError)
+      break;
 
     // Create a parse error
     // TODO: Correct error
@@ -197,24 +200,27 @@ static void compiler_parse_number(CompilerContext *ctx) {
 }
 
 static void compiler_parse_string(CompilerContext *ctx) {
-  compiler_emit_constant(ctx,
-                         OBJECT_VAL(mesche_object_make_string(ctx->vm,
-                                                              ctx->parser->previous.start + 1,
-                                                              ctx->parser->previous.length - 2)));
+  compiler_emit_constant(
+      ctx, OBJECT_VAL(mesche_object_make_string(ctx->vm, ctx->parser->previous.start + 1,
+                                                ctx->parser->previous.length - 2)));
 }
 
 static void compiler_parse_keyword(CompilerContext *ctx) {
-  compiler_emit_constant(ctx,
-                         OBJECT_VAL(mesche_object_make_keyword(ctx->vm,
-                                                               ctx->parser->previous.start + 1,
-                                                               ctx->parser->previous.length - 1)));
+  compiler_emit_constant(
+      ctx, OBJECT_VAL(mesche_object_make_keyword(ctx->vm, ctx->parser->previous.start + 1,
+                                                 ctx->parser->previous.length - 1)));
 }
 
 static void compiler_parse_literal(CompilerContext *ctx) {
   switch (ctx->parser->previous.kind) {
-  case TokenKindNil: compiler_emit_byte(ctx, OP_NIL); break;
-  case TokenKindTrue: compiler_emit_byte(ctx, OP_T); break;
-  default: return; // We shouldn't hit this
+  case TokenKindNil:
+    compiler_emit_byte(ctx, OP_NIL);
+    break;
+  case TokenKindTrue:
+    compiler_emit_byte(ctx, OP_T);
+    break;
+  default:
+    return; // We shouldn't hit this
   }
 }
 
@@ -236,7 +242,8 @@ static void compiler_parse_block(CompilerContext *ctx, bool expect_end_paren) {
 }
 
 static bool compiler_identifiers_equal(Token *a, Token *b) {
-  if (a->length != b->length) return false;
+  if (a->length != b->length)
+    return false;
   return memcmp(a->start, b->start, a->length) == 0;
 }
 
@@ -246,7 +253,7 @@ static void compiler_add_local(CompilerContext *ctx, Token name) {
   }
   Local *local = &ctx->locals[ctx->local_count++];
   local->name = name; // No need to copy, will only be used during compilation
-  local->depth = -1; // The variable is uninitialized until assigned
+  local->depth = -1;  // The variable is uninitialized until assigned
   local->is_captured = false;
 }
 
@@ -287,7 +294,8 @@ static int compiler_add_upvalue(CompilerContext *ctx, uint8_t index, bool is_loc
 
 static int compiler_resolve_upvalue(CompilerContext *ctx, Token *name) {
   // If there's no parent context then there's nothing to close over
-  if (ctx->parent == NULL) return -1;
+  if (ctx->parent == NULL)
+    return -1;
 
   // First try to resolve the variable as a local in the parent
   int local = compiler_resolve_local(ctx->parent, name);
@@ -308,7 +316,8 @@ static int compiler_resolve_upvalue(CompilerContext *ctx, Token *name) {
 
 static void compiler_local_mark_initialized(CompilerContext *ctx) {
   // If we're in global scope, don't do anything
-  if (ctx->scope_depth == 0) return;
+  if (ctx->scope_depth == 0)
+    return;
 
   // Mark the latest local variable as initialized
   ctx->locals[ctx->local_count - 1].depth = ctx->scope_depth;
@@ -316,7 +325,8 @@ static void compiler_local_mark_initialized(CompilerContext *ctx) {
 
 static void compiler_declare_variable(CompilerContext *ctx) {
   // No need to declare a global, it will be dynamically resolved
-  if (ctx->scope_depth == 0) return;
+  if (ctx->scope_depth == 0)
+    return;
 
   // Start from the most recent local and work backwards to
   // find an existing variable with the same binding in this scope
@@ -324,7 +334,8 @@ static void compiler_declare_variable(CompilerContext *ctx) {
   for (int i = ctx->local_count - 1; i >= 0; i--) {
     // If the local is in a different scope, stop looking
     Local *local = &ctx->locals[i];
-    if (local->depth != -1 && local->depth < ctx->scope_depth) break;
+    if (local->depth != -1 && local->depth < ctx->scope_depth)
+      break;
 
     // In the same scope, is the identifier the same?
     if (compiler_identifiers_equal(name, &local->name)) {
@@ -337,13 +348,13 @@ static void compiler_declare_variable(CompilerContext *ctx) {
   compiler_add_local(ctx, *name);
 }
 
-static uint8_t compiler_parse_symbol(CompilerContext *ctx) {
+static uint8_t compiler_parse_symbol(CompilerContext *ctx, bool is_global) {
   // Declare the variable and exit if we're in a local scope
   compiler_declare_variable(ctx);
-  if (ctx->scope_depth > 0) return 0;
+  if (!is_global && ctx->scope_depth > 0)
+    return 0;
 
-  Value new_string = OBJECT_VAL(mesche_object_make_string(ctx->vm,
-                                                          ctx->parser->previous.start,
+  Value new_string = OBJECT_VAL(mesche_object_make_string(ctx->vm, ctx->parser->previous.start,
                                                           ctx->parser->previous.length));
 
   // Reuse an existing constant for the same string if possible
@@ -370,7 +381,7 @@ static void compiler_parse_identifier(CompilerContext *ctx) {
     // Found an upvalue
     compiler_emit_bytes(ctx, OP_READ_UPVALUE, (uint8_t)local_index);
   } else {
-    uint8_t variable_constant = compiler_parse_symbol(ctx);
+    uint8_t variable_constant = compiler_parse_symbol(ctx, true);
     compiler_emit_bytes(ctx, OP_READ_GLOBAL, variable_constant);
   }
 }
@@ -394,7 +405,7 @@ static void compiler_parse_set(CompilerContext *ctx) {
 
   // If there isn't a local, use a global variable instead
   if (arg == -1) {
-    arg = compiler_parse_symbol(ctx);
+    arg = compiler_parse_symbol(ctx, true);
     instr = OP_SET_GLOBAL;
   } else if ((arg = compiler_resolve_upvalue(ctx, &ctx->parser->previous)) != -1) {
     instr = OP_SET_UPVALUE;
@@ -444,7 +455,7 @@ static void compiler_parse_let(CompilerContext *ctx) {
 
     // compiler_parse_symbol expects the symbol token to be in parser->previous
     compiler_advance(ctx);
-    compiler_parse_symbol(ctx);
+    compiler_parse_symbol(ctx, false);
     compiler_parse_expr(ctx);
     compiler_define_variable(ctx, 0 /* Irrelevant, this is local */);
 
@@ -465,12 +476,14 @@ static void compiler_parse_lambda_inner(CompilerContext *ctx) {
   for (;;) {
     // Try to parse each argument until we reach a closing paren
     if (func_ctx.parser->current.kind == TokenKindRightParen) {
-      compiler_consume(&func_ctx, TokenKindRightParen, "Expected right paren to end argument list.");
+      compiler_consume(&func_ctx, TokenKindRightParen,
+                       "Expected right paren to end argument list.");
       break;
     }
 
     if (func_ctx.parser->current.kind == TokenKindKeyword) {
-      compiler_consume(&func_ctx, TokenKindKeyword, "Expected :keys keyword to start keyword list.");
+      compiler_consume(&func_ctx, TokenKindKeyword,
+                       "Expected :keys keyword to start keyword list.");
       in_keyword_list = true;
     }
 
@@ -484,7 +497,7 @@ static void compiler_parse_lambda_inner(CompilerContext *ctx) {
       // Parse the argument
       // TODO: Ensure a symbol comes next
       compiler_advance(&func_ctx);
-      uint8_t constant = compiler_parse_symbol(&func_ctx);
+      uint8_t constant = compiler_parse_symbol(&func_ctx, false);
       compiler_define_variable(&func_ctx, constant);
     } else {
       compiler_advance(&func_ctx);
@@ -497,21 +510,21 @@ static void compiler_parse_lambda_inner(CompilerContext *ctx) {
       }
 
       // Parse the keyword name and define it as a local variable
-      uint8_t constant = compiler_parse_symbol(&func_ctx);
+      uint8_t constant = compiler_parse_symbol(&func_ctx, false);
       compiler_define_variable(&func_ctx, constant);
 
       // Parse the default if we're expecting one
       uint8_t default_constant = 0;
       if (has_default) {
-        compiler_consume(&func_ctx, TokenKindRightParen, "Expected right paren after keyword default value.");
+        compiler_consume(&func_ctx, TokenKindRightParen,
+                         "Expected right paren after keyword default value.");
       }
 
       // Add the keyword definition to the function
       KeywordArgument keyword_arg = {
-        .name = mesche_object_make_string(ctx->vm,
-                                          ctx->parser->previous.start,
-                                          ctx->parser->previous.length),
-        .default_index = default_constant
+          .name = mesche_object_make_string(ctx->vm, ctx->parser->previous.start,
+                                            ctx->parser->previous.length),
+          .default_index = default_constant,
       };
 
       mesche_object_function_keyword_add(ctx->mem, func_ctx.function, keyword_arg);
@@ -551,7 +564,7 @@ static void compiler_parse_define(CompilerContext *ctx) {
 
   compiler_consume(ctx, TokenKindSymbol, "Expected symbol after 'define'");
 
-  uint8_t variable_constant = variable_constant = compiler_parse_symbol(ctx);
+  uint8_t variable_constant = variable_constant = compiler_parse_symbol(ctx, true);
   if (is_func) {
     // Let the lambda parser take over
     compiler_parse_lambda_inner(ctx);
@@ -617,32 +630,66 @@ static void compiler_parse_if(CompilerContext *ctx) {
 }
 
 static void compiler_parse_operator_call(CompilerContext *ctx, Token *call_token) {
-  TokenKind operator = call_token->kind;
-  switch(operator) {
-  case TokenKindPlus: compiler_emit_byte(ctx, OP_ADD); break;
-  case TokenKindMinus: compiler_emit_byte(ctx, OP_SUBTRACT); break;
-  case TokenKindStar: compiler_emit_byte(ctx, OP_MULTIPLY); break;
-  case TokenKindSlash: compiler_emit_byte(ctx, OP_DIVIDE); break;
-  case TokenKindAnd:  compiler_emit_byte(ctx, OP_AND); break;
-  case TokenKindOr:  compiler_emit_byte(ctx, OP_OR); break;
-  case TokenKindNot:  compiler_emit_byte(ctx, OP_NOT); break;
-  case TokenKindEqv:  compiler_emit_byte(ctx, OP_EQV); break;
-  case TokenKindEqual:  compiler_emit_byte(ctx, OP_EQUAL); break;
-  case TokenKindDisplay:  compiler_emit_byte(ctx, OP_DISPLAY); break;
-  default: return; // We shouldn't hit this
+  TokenKind operator= call_token->kind;
+  switch (operator) {
+  case TokenKindPlus:
+    compiler_emit_byte(ctx, OP_ADD);
+    break;
+  case TokenKindMinus:
+    compiler_emit_byte(ctx, OP_SUBTRACT);
+    break;
+  case TokenKindStar:
+    compiler_emit_byte(ctx, OP_MULTIPLY);
+    break;
+  case TokenKindSlash:
+    compiler_emit_byte(ctx, OP_DIVIDE);
+    break;
+  case TokenKindAnd:
+    compiler_emit_byte(ctx, OP_AND);
+    break;
+  case TokenKindOr:
+    compiler_emit_byte(ctx, OP_OR);
+    break;
+  case TokenKindNot:
+    compiler_emit_byte(ctx, OP_NOT);
+    break;
+  case TokenKindEqv:
+    compiler_emit_byte(ctx, OP_EQV);
+    break;
+  case TokenKindEqual:
+    compiler_emit_byte(ctx, OP_EQUAL);
+    break;
+  case TokenKindDisplay:
+    compiler_emit_byte(ctx, OP_DISPLAY);
+    break;
+  default:
+    return; // We shouldn't hit this
   }
 }
 
 static bool compiler_parse_special_form(CompilerContext *ctx, Token *call_token) {
-  TokenKind operator = call_token->kind;
-  switch(operator) {
-  case TokenKindBegin: compiler_parse_block(ctx, true); break;
-  case TokenKindDefine: compiler_parse_define(ctx); break;
-  case TokenKindSet: compiler_parse_set(ctx); break;
-  case TokenKindLet: compiler_parse_let(ctx); break;
-  case TokenKindIf: compiler_parse_if(ctx); break;
-  case TokenKindLambda: compiler_parse_lambda(ctx); break;
-  default: return false; // No special form found
+  TokenKind operator= call_token->kind;
+  switch (operator) {
+  case TokenKindBegin:
+    compiler_parse_block(ctx, true);
+    break;
+  case TokenKindDefine:
+    compiler_parse_define(ctx);
+    break;
+  case TokenKindSet:
+    compiler_parse_set(ctx);
+    break;
+  case TokenKindLet:
+    compiler_parse_let(ctx);
+    break;
+  case TokenKindIf:
+    compiler_parse_if(ctx);
+    break;
+  case TokenKindLambda:
+    compiler_parse_lambda(ctx);
+    break;
+  default:
+    return false; // No special form found
   }
 
   return true;
@@ -765,9 +812,9 @@ ObjectFunction *mesche_compile_source(VM *vm, const char *script_source) {
 
   // Set up the context
   CompilerContext ctx = {
-    .vm = vm,
-    .parser = &parser,
-    .scanner = &scanner,
+      .vm = vm,
+      .parser = &parser,
+      .scanner = &scanner,
   };
   compiler_init_context(&ctx, NULL, TYPE_SCRIPT);
 

@@ -1,3 +1,26 @@
-(show-preview-window 2500 1406)
-(flux-harmonic-thumbnail "February 17, 2022")
-(render-to-file "thumbnail.png")
+(define width 2500)
+(define height 1406)
+
+(define (font-load :keys family weight size)
+  (font-load-internal family weight size))
+
+(define (image-load path)
+  (image-load-internal path))
+
+(define (scene :keys width height)
+  (display "Defining a scene!")
+  t)
+
+(show-preview-window width height)
+
+(define jost-font (font-load :family "Jost" :weight "SemiBold" :size 450))
+
+(define bg-image (image-load "/home/daviwil/Notes/Shows/FluxHarmonic/Media/Flux-Harmonic-BG-Base.png"))
+(define logo-image (image-load "/home/daviwil/Notes/Shows/FluxHarmonic/Media/Flux Harmonic.png"))
+
+(define flux-thumbnail
+  (scene :width width
+         :height height))
+
+;; (flux-harmonic-thumbnail "February 17, 2022")
+;; (render-to-file "thumbnail.png")

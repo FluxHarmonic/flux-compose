@@ -1,8 +1,8 @@
-#include <stdlib.h>
 #include <stdio.h>
+#include <stdlib.h>
 
-#include "util.h"
 #include "mem.h"
+#include "util.h"
 
 // This is arbitrarily picked, inspired by Crafting Interpreters.
 // It will probably need to be adjusted over time!
@@ -23,13 +23,13 @@ void *mesche_mem_realloc(MescheMemory *mem, void *mem_ptr, size_t old_size, size
 
   // Decide whether to collect garbage
   if (new_size > old_size) {
-    #ifdef DEBUG_STRESS_GC
+#ifdef DEBUG_STRESS_GC
     mesche_mem_collect_garbage(mem);
-    #else
+#else
     if (mem->bytes_allocated > mem->next_gc) {
       mesche_mem_collect_garbage(mem);
     }
-    #endif
+#endif
   }
 
   if (new_size == 0) {
@@ -52,24 +52,22 @@ void mesche_mem_collect_garbage(MescheMemory *mem) {
     PANIC("No garbage collector function is registered.");
   }
 
-  #ifdef DEBUG_LOG_GC
+#ifdef DEBUG_LOG_GC
   printf("-- GC starting...\n");
   size_t before_size = mem->bytes_allocated;
-  #endif
+#endif
 
   // Collect garbage and adjust the next GC limit
   mem->collect_garbage_func(mem);
   mem->next_gc = mem->bytes_allocated * GC_HEAP_GROW_FACTOR;
 
-  #ifdef DEBUG_LOG_GC
+#ifdef DEBUG_LOG_GC
   printf("-- GC finished: freed %zu bytes (from %zu to %zu), next GC at %zu bytes\n",
-         before_size - mem->bytes_allocated,
-         before_size,
-         mem->bytes_allocated,
-         mem->next_gc);
-  #endif
+         before_size - mem->bytes_allocated, before_size, mem->bytes_allocated, mem->next_gc);
+#endif
 }
 
 void mesche_mem_report(MescheMemory *mem) {
-  printf("-- %zu bytes allocated in memory, next GC at %zu bytes\n", mem->bytes_allocated, mem->next_gc);
+  printf("-- %zu bytes allocated in memory, next GC at %zu bytes\n", mem->bytes_allocated,
+         mem->next_gc);
 }

@@ -127,3 +127,14 @@ void flux_texture_png_save(const char *file_path, const unsigned char *image_dat
   fflush(out_file);
   fclose(out_file);
 }
+
+Value flux_texture_func_image_load_internal(MescheMemory *mem, int arg_count, Value *args) {
+  if (arg_count != 1) {
+    flux_log("Function requires 1 parameter.");
+  }
+
+  char *file_path = AS_CSTRING(args[0]);
+  FluxTexture *texture = flux_texture_png_load(file_path);
+
+  return OBJECT_VAL(mesche_object_make_pointer((VM *)mem, texture, true));
+}

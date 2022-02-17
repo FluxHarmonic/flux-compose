@@ -7,6 +7,7 @@
 #include <ft2build.h>
 #include <glad/glad.h>
 #include <inttypes.h>
+#include <mesche.h>
 #include <stdbool.h>
 #include <string.h>
 #include FT_FREETYPE_H
@@ -47,7 +48,7 @@ const char *FontFragmentShaderText =
            gl_FragColor = color * sampled;
          });
 
-FluxFont flux_font_load_file(const char *font_path, uint8_t font_size) {
+FluxFont flux_font_load_file(const char *font_path, int font_size) {
   char char_id = 0;
   FluxFontChar *current_char;
 
@@ -85,7 +86,7 @@ FluxFont flux_font_load_file(const char *font_path, uint8_t font_size) {
   /* flux_log("Has kerning: %d\n", FT_HAS_KERNING(face)); */
 
   // Load glyphs for each character
-  for (char_id = ASCII_CHAR_START; char_id < ASCII_CHAR_END + 1; char_id++) {
+  for (char_id = ASCII_CHAR_START; char_id < ASCII_CHAR_END; char_id++) {
     // Load the character glyph and information
     /* flux_log("Loading glyph for char: %c\n", char_id); */
     if (FT_Load_Char(face, char_id, FT_LOAD_RENDER)) {
@@ -197,18 +198,17 @@ void flux_font_print_all(const char *family_name) {
   }
 
   // Build a font set from the pattern
-  FcObjectSet *object_set = FcObjectSetBuild(FC_FAMILY, FC_STYLE, FC_LANG, FC_FILE, (char *) 0);
+  FcObjectSet *object_set = FcObjectSetBuild(FC_FAMILY, FC_STYLE, FC_LANG, FC_FILE, (char *)0);
   FcFontSet *font_set = FcFontList(config, pattern, object_set);
 
   if (font_set) {
     flux_log("Font count: %d\n", font_set->nfont);
     for (int i = 0; font_set && i < font_set->nfont; ++i) {
-      FcPattern* font = font_set->fonts[i];
+      FcPattern *font = font_set->fonts[i];
       FcChar8 *file, *style, *family;
       if (FcPatternGetString(font, FC_FILE, 0, &file) == FcResultMatch &&
           FcPatternGetString(font, FC_FAMILY, 0, &family) == FcResultMatch &&
-          FcPatternGetString(font, FC_STYLE, 0, &style) == FcResultMatch)
-      {
+          FcPatternGetString(font, FC_STYLE, 0, &style) == FcResultMatch) {
         flux_log("Font path: %s (family %s, style %s)\n", file, family, style);
       }
     }
@@ -224,4 +224,33 @@ void flux_font_print_all(const char *family_name) {
   }
 
   FcConfigDestroy(config);
+}
+
+Value flux_graphics_func_load_font_internal(MescheMemory *mem, int arg_count, Value *args) {
+  if (arg_count != 3) {
+    flux_log("Function requires 3 parameters.");
+  }
+
+  FluxFont *font = NULL;
+
+  char *family = AS_CSTRING(args[0]);
+  char *weight = AS_CSTRING(args[1]);
+  double size = AS_NUMBER(args[3]);
+
+  char font_spec[100];
+
+  sprintf(font_spec, "%s %s", family, weight);
+
+  char *font_path = flux_font_resolve_path(font_spec);
+  flux_log("Resolved font path: %s\n", font_path);
+  if (!font_path) {
+    flux_log("Could not find a file for font: %s\n", font_spec);
+  } else {
+    // Load the font and free the allocation font path
+    font = flux_font_load_file(font_path, (int)size);
+    free(font_path);
+    font_path = NULL;
+  }
+
+  return OBJECT_VAL(mesche_object_make_pointer((VM *)mem, font, true));
 }

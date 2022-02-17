@@ -1,14 +1,14 @@
 #ifndef mesche_object_h
 #define mesche_object_h
 
-#include "vm.h"
 #include "chunk.h"
 #include "value.h"
+#include "vm.h"
 
 #define IS_OBJECT(value) ((value).kind == VALUE_OBJECT)
 #define AS_OBJECT(value) ((value).as.object)
 
-#define OBJECT_VAL(value) ((Value){VALUE_OBJECT, {.object = (Object*)value}})
+#define OBJECT_VAL(value) ((Value){VALUE_OBJECT, {.object = (Object *)value}})
 #define OBJECT_KIND(value) (AS_OBJECT(value)->kind)
 
 #define IS_FUNCTION(value) mesche_object_is_kind(value, ObjectKindFunction)
@@ -16,6 +16,9 @@
 
 #define IS_KEYWORD(value) mesche_object_is_kind(value, ObjectKindKeyword)
 #define AS_KEYWORD(value) ((ObjectKeyword *)AS_OBJECT(value))
+
+#define IS_POINTER(value) mesche_object_is_kind(value, ObjectKindPointer)
+#define AS_POINTER(value) ((ObjectPointer *)AS_OBJECT(value))
 
 #define IS_CLOSURE(value) mesche_object_is_kind(value, ObjectKindClosure)
 #define AS_CLOSURE(value) ((ObjectClosure *)AS_OBJECT(value))
@@ -33,7 +36,8 @@ typedef enum {
   ObjectKindUpvalue,
   ObjectKindFunction,
   ObjectKindClosure,
-  ObjectKindNativeFunction
+  ObjectKindNativeFunction,
+  ObjectKindPointer
 } ObjectKind;
 
 struct Object {
@@ -61,10 +65,7 @@ struct ObjectSymbol {
   char chars[];
 };
 
-typedef enum {
-  TYPE_FUNCTION,
-  TYPE_SCRIPT
-} FunctionType;
+typedef enum { TYPE_FUNCTION, TYPE_SCRIPT } FunctionType;
 
 typedef struct {
   ObjectString *name;
@@ -106,13 +107,21 @@ typedef struct {
   FunctionPtr function;
 } ObjectNativeFunction;
 
+typedef struct {
+  Object object;
+  void *ptr;
+  bool is_managed;
+} ObjectPointer;
+
 ObjectString *mesche_object_make_string(VM *vm, const char *chars, int length);
 ObjectKeyword *mesche_object_make_keyword(VM *vm, const char *chars, int length);
 ObjectUpvalue *mesche_object_make_upvalue(VM *vm, Value *slot);
 ObjectFunction *mesche_object_make_function(VM *vm, FunctionType type);
-void mesche_object_function_keyword_add(MescheMemory *mem, ObjectFunction *function, KeywordArgument keyword_arg);
+void mesche_object_function_keyword_add(MescheMemory *mem, ObjectFunction *function,
+                                        KeywordArgument keyword_arg);
 ObjectClosure *mesche_object_make_closure(VM *vm, ObjectFunction *function);
 ObjectNativeFunction *mesche_object_make_native_function(VM *vm, FunctionPtr function);
+ObjectPointer *mesche_object_make_pointer(VM *vm, void *ptr, bool is_managed);
 
 void mesche_object_free(VM *vm, struct Object *object);
 void mesche_object_print(Value value);

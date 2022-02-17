@@ -57,6 +57,8 @@ extern FluxTexture flux_texture_png_load(char *file_path);
 extern void flux_texture_png_save(const char *file_path, const unsigned char *image_data,
                                   const uint32_t width, const uint32_t height);
 
+Value flux_texture_func_image_load_internal(MescheMemory *mem, int arg_count, Value *args);
+
 // Graphics ---------------------------------------
 
 typedef struct _FluxWindow *FluxWindow;
@@ -103,9 +105,9 @@ extern void flux_graphics_draw_texture_ex(FluxRenderContext context, FluxTexture
 extern GLuint flux_graphics_shader_compile(const FluxShaderFile *shader_files,
                                            uint32_t shader_count);
 
-Value flux_graphics_func_show_preview_window(int arg_count, Value *args);
-Value flux_graphics_func_render_to_file(int arg_count, Value *args);
-Value flux_graphics_func_flux_harmonic_thumbnail(int arg_count, Value *args);
+Value flux_graphics_func_show_preview_window(MescheMemory *mem, int arg_count, Value *args);
+Value flux_graphics_func_render_to_file(MescheMemory *mem, int arg_count, Value *args);
+Value flux_graphics_func_flux_harmonic_thumbnail(MescheMemory *mem, int arg_count, Value *args);
 
 // Shaders ---------------------------------------
 
@@ -115,12 +117,14 @@ Value flux_graphics_func_flux_harmonic_thumbnail(int arg_count, Value *args);
 
 typedef struct _FluxFont *FluxFont;
 
-extern FluxFont flux_font_load_file(const char *font_path, uint8_t font_size);
+extern FluxFont flux_font_load_file(const char *font_path, int font_size);
 extern void flux_font_draw_text(FluxRenderContext context, FluxFont font, const char *text,
                                 float pos_x, float pos_y);
 
 // The returned string must be freed!
 extern char *flux_font_resolve_path(const char *font_name);
+
+Value flux_graphics_func_load_font_internal(MescheMemory *mem, int arg_count, Value *args);
 
 // Scene ------------------------------------------
 

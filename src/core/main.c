@@ -39,19 +39,21 @@ int main(int argc, char **argv) {
     mesche_vm_define_native(&vm, "render-to-file", flux_graphics_func_render_to_file);
     mesche_vm_define_native(&vm, "flux-harmonic-thumbnail",
                             flux_graphics_func_flux_harmonic_thumbnail);
+    mesche_vm_define_native(&vm, "font-load-internal", flux_graphics_func_load_font_internal);
+    mesche_vm_define_native(&vm, "image-load-internal", flux_texture_func_image_load_internal);
 
     mesche_vm_eval_string(&vm, script_source);
     printf("\n");
 
     // Report the final memory allocation statistics
-    mesche_mem_report((MescheMemory*)&vm);
+    mesche_mem_report((MescheMemory *)&vm);
+
+    // Wait for the graphics loop to complete
+    flux_graphics_loop_wait();
 
     // Free the VM and allocated source string
     mesche_vm_free(&vm);
     free((void *)script_source);
-
-    // Wait for the graphics loop to complete
-    flux_graphics_loop_wait();
   }
 
   // TODO: Destroy window properly

@@ -675,7 +675,7 @@ void flux_graphics_end(void) {
   glfwTerminate();
 }
 
-Value flux_graphics_func_show_preview_window(int arg_count, Value *args) {
+Value flux_graphics_func_show_preview_window(MescheMemory *mem, int arg_count, Value *args) {
   if (arg_count != 2) {
     flux_log("Function requires 2 number parameters.");
   }
@@ -697,7 +697,7 @@ Value flux_graphics_func_show_preview_window(int arg_count, Value *args) {
   return T_VAL;
 }
 
-Value flux_graphics_func_render_to_file(int arg_count, Value *args) {
+Value flux_graphics_func_render_to_file(MescheMemory *mem, int arg_count, Value *args) {
   if (arg_count != 1) {
     flux_log("Function requires a path to the output file.");
   }
@@ -707,7 +707,7 @@ Value flux_graphics_func_render_to_file(int arg_count, Value *args) {
   memcpy(output_image_path, file_path, strlen(file_path));
 }
 
-Value flux_graphics_func_flux_harmonic_thumbnail(int arg_count, Value *args) {
+Value flux_graphics_func_flux_harmonic_thumbnail(MescheMemory *mem, int arg_count, Value *args) {
   if (arg_count != 1) {
     flux_log("Function requires a string for the date.");
   }

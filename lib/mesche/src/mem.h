@@ -23,16 +23,15 @@ typedef struct MescheMemory {
   size_t next_gc;
 } MescheMemory;
 
-#define GROW_CAPACITY(capacity) ((capacity) < 8 ? 8 : (capacity) * 2);
-#define GROW_ARRAY(mem, type, pointer, old_size, new_size)                \
-  (type*)mesche_mem_realloc(mem, pointer, sizeof(type) * old_size, sizeof(type) * new_size)
-  /* flux_log("GROW_ARRAY for type %s at %d\n", #type, __LINE__); */
+#define GROW_CAPACITY(capacity) ((capacity) < 8 ? 8 : (capacity)*2);
+#define GROW_ARRAY(mem, type, pointer, old_size, new_size)                                         \
+  (type *)mesche_mem_realloc(mem, pointer, sizeof(type) * old_size, sizeof(type) * new_size)
+/* flux_log("GROW_ARRAY for type %s at %d\n", #type, __LINE__); */
 
 #define FREE(mem, type, pointer) mesche_mem_realloc((MescheMemory *)mem, pointer, sizeof(type), 0);
-#define FREE_ARRAY(mem, type, pointer, size)              \
+#define FREE_ARRAY(mem, type, pointer, size)                                                       \
   mesche_mem_realloc((MescheMemory *)mem, (pointer), sizeof(type) * size, 0)
-#define FREE_SIZE(mem, pointer, size)             \
-  mesche_mem_realloc((MescheMemory *)mem, (pointer), size, 0)
+#define FREE_SIZE(mem, pointer, size) mesche_mem_realloc((MescheMemory *)mem, (pointer), size, 0)
 
 void mesche_mem_init(MescheMemory *mem, MescheMemoryCollectGarbageFunc collect_garbage_func);
 void *mesche_mem_realloc(MescheMemory *mem, void *mem_ptr, size_t old_size, size_t new_size);
