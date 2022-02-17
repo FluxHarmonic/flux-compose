@@ -35,6 +35,7 @@ typedef enum {
 
 struct Object {
   ObjectKind kind;
+  bool is_marked;
   struct Object *next;
 };
 
@@ -91,7 +92,7 @@ ObjectFunction *mesche_object_make_function(VM *vm, FunctionType type);
 ObjectClosure *mesche_object_make_closure(VM *vm, ObjectFunction *function);
 ObjectNativeFunction *mesche_object_make_native_function(VM *vm, FunctionPtr function);
 
-void mesche_object_free(struct Object *object);
+void mesche_object_free(VM *vm, struct Object *object);
 void mesche_object_print(Value value);
 
 #endif

@@ -6,7 +6,7 @@
 #include "object.h"
 
 #define ALLOC(vm, type, count) \
-  (type)mesche_mem_realloc(NULL, 0, sizeof(type) * count)
+  (type)mesche_mem_realloc((MescheMemory *)vm, NULL, 0, sizeof(type) * count)
 
 #define ALLOC_OBJECT(vm, type, object_kind)            \
   (type *)object_allocate(vm, sizeof(type), object_kind)
@@ -19,12 +19,17 @@ static inline bool object_is_kind(Value value, ObjectKind kind) {
 }
 
 static Object* object_allocate(VM *vm, size_t size, ObjectKind kind) {
-  Object *object = (Object*)mesche_mem_realloc(NULL, 0, size);
+  Object *object = (Object*)mesche_mem_realloc((MescheMemory *)vm, NULL, 0, size);
   object->kind = kind;
 
   // Keep track of the object for garbage collection
+  object->is_marked = false;
   object->next = vm->objects;
   vm->objects = object;
+
+  #ifdef DEBUG_LOG_GC
+  printf("%p    allocate %zu for %d\n", (void*)object, size, kind);
+  #endif
 
   return object;
 }
@@ -53,8 +58,14 @@ ObjectString *mesche_object_make_string(VM *vm, const char *chars, int length) {
   string->length = length;
   string->hash = hash;
 
+  // Push the string onto the stack temporarily to avoid GC
+  mesche_vm_stack_push(vm, OBJECT_VAL(string));
+
   // Add the string to the interned set
-  mesche_table_set(&vm->strings, string, NIL_VAL);
+  mesche_table_set((MescheMemory *)vm, &vm->strings, string, NIL_VAL);
+
+  // Pop the string back off the stack
+  mesche_vm_stack_pop(vm);
 
   return string;
 }
@@ -73,7 +84,7 @@ ObjectString *mesche_object_make_symbol(VM *vm, const char *chars, int length) {
   string->hash = hash;
 
   // Add the string to the interned set
-  mesche_table_set(&vm->strings, string, NIL_VAL);
+  mesche_table_set((MescheMemory *)vm, &vm->strings, string, NIL_VAL);
 
   return string;
 }
@@ -117,29 +128,34 @@ ObjectNativeFunction *mesche_object_make_native_function(VM *vm, FunctionPtr fun
   return native;
 }
 
-void mesche_object_free(Object *object) {
+void mesche_object_free(VM *vm, Object *object) {
   ObjectString *string = NULL;
+
+  #ifdef DEBUG_LOG_GC
+  printf("%p    free   ", (void*)object);
+  mesche_value_print(OBJECT_VAL(object));
+  printf("\n");
+  #endif
 
   switch (object->kind) {
   case ObjectKindString:
     string = (ObjectString*)object;
-    FREE_SIZE(string, (sizeof(ObjectString) + string->length + 1));
+    FREE_SIZE(vm, string, (sizeof(ObjectString) + string->length + 1));
     break;
   case ObjectKindUpvalue:
-    FREE(ObjectUpvalue, object);
+    FREE(vm, ObjectUpvalue, object);
     break;
   case ObjectKindFunction:
-    FREE(ObjectFunction, object);
+    FREE(vm, ObjectFunction, object);
     break;
-  case ObjectKindClosure:
-    {
-      ObjectClosure *closure = (ObjectClosure*)object;
-      FREE_ARRAY(ObjectUpvalue *, closure->upvalues, closure->upvalue_count);
-      FREE(ObjectFunction, object);
-      break;
-    }
+  case ObjectKindClosure: {
+    ObjectClosure *closure = (ObjectClosure*)object;
+    FREE_ARRAY(vm, ObjectUpvalue *, closure->upvalues, closure->upvalue_count);
+    FREE(vm, ObjectFunction, object);
+    break;
+  }
   case ObjectKindNativeFunction:
-    FREE(ObjectNativeFunction, object);
+    FREE(vm, ObjectNativeFunction, object);
     break;
   default:
     PANIC("Don't know how to free object kind %d!", object->kind);

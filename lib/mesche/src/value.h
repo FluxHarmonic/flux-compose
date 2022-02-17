@@ -11,6 +11,8 @@ typedef struct ObjectUpvalue ObjectUpvalue;
 
 #include <stdbool.h>
 
+#include "mem.h"
+
 #define T_VAL ((Value){VALUE_TRUE, {.number = 0}})
 #define NIL_VAL ((Value){VALUE_NIL, {.number = 0}})
 #define NUMBER_VAL(value) ((Value){VALUE_NUMBER, {.number = value}})
@@ -43,8 +45,8 @@ typedef struct {
 } ValueArray;
 
 void mesche_value_array_init(ValueArray *array);
-void mesche_value_array_write(ValueArray *array, Value value);
-void mesche_value_array_free(ValueArray *array);
+void mesche_value_array_write(MescheMemory *mem, ValueArray *array, Value value);
+void mesche_value_array_free(MescheMemory *mem, ValueArray *array);
 void mesche_value_print(Value value);
 bool mesche_value_equalp(Value a, Value b);
 

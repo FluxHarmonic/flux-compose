@@ -16,12 +16,12 @@
 // NOTE: Enable this for diagnostic purposes
 /* #define DEBUG_TRACE_EXECUTION */
 
-static void vm_stack_push(VM *vm, Value value) {
+void mesche_vm_stack_push(VM *vm, Value value) {
   *vm->stack_top = value;
   vm->stack_top++;
 }
 
-static Value vm_stack_pop(VM *vm) {
+Value mesche_vm_stack_pop(VM *vm) {
   vm->stack_top--;
   return *vm->stack_top;
 }
@@ -52,25 +52,196 @@ static void vm_runtime_error(VM *vm, const char *format, ...) {
 
   vm_reset_stack(vm);
 }
+
 static void vm_free_objects(VM *vm) {
   Object *object = vm->objects;
   while (object != NULL) {
     Object *next = object->next;
-    mesche_object_free(object);
+    mesche_object_free(vm, object);
     object = next;
+  }
+
+  if (vm->gray_stack) {
+    free(vm->gray_stack);
   }
 }
 
+void mesche_mem_mark_object(VM *vm, Object *object) {
+  if (object == NULL) return;
+  if (object->is_marked) return;
+
+  #ifdef DEBUG_LOG_GC
+  printf("%p    mark    ", object);
+  mesche_value_print(OBJECT_VAL(object));
+  printf("\n");
+  #endif
+
+  object->is_marked = true;
+
+  // Add the object to the gray stack if it has references to trace
+  if (object->kind != ObjectKindString
+      && object->kind != ObjectKindSymbol
+      && object->kind != ObjectKindKeyword
+      && object->kind != ObjectKindNativeFunction) {
+    // Resize the gray stack if necessary (tracks visited objects)
+    if (vm->gray_capacity < vm->gray_count + 1) {
+      vm->gray_capacity = GROW_CAPACITY(vm->gray_capacity);
+      vm->gray_stack = (Object**)realloc(vm->gray_stack, sizeof(Object*) * vm->gray_capacity);
+
+      // Check if something went wrong with allocation
+      if (vm->gray_stack == NULL) {
+        PANIC("VM's gray stack could not be reallocated.");
+      }
+    }
+
+    // Add the object to the gray stack
+    vm->gray_stack[vm->gray_count++] = object;
+  }
+}
+
+static void mem_mark_value(VM *vm, Value value) {
+  if (IS_OBJECT(value)) mesche_mem_mark_object(vm, AS_OBJECT(value));
+}
+
+static void mem_mark_table(VM *vm, Table *table) {
+  for (int i = 0; i < table->capacity; i++) {
+    Entry *entry = &table->entries[i];
+    mesche_mem_mark_object(vm, (Object *)entry->key);
+    mem_mark_value(vm, entry->value);
+  }
+}
+
+static void mem_mark_roots(void *target) {
+  VM *vm = (VM*)target;
+  for (Value *slot = vm->stack; slot < vm->stack_top; slot++) {
+    mem_mark_value(vm, *slot);
+  }
+
+  for (int i = 0; i < vm->frame_count; i++) {
+    mesche_mem_mark_object(vm, (Object *)vm->frames[i].closure);
+  }
+
+  for (ObjectUpvalue *upvalue = vm->open_upvalues; upvalue != NULL; upvalue = upvalue->next) {
+    mesche_mem_mark_object(vm, (Object *)upvalue);
+  }
+
+  mem_mark_table(vm, &vm->globals);
+}
+
+static void mem_mark_array(VM *vm, ValueArray *array) {
+  for (int i = 0; i < array->count; i++) {
+    mem_mark_value(vm, array->values[i]);
+  }
+}
+
+static void mem_darken_object(VM *vm, Object *object) {
+  #ifdef DEBUG_LOG_GC
+  printf("%p    darken ", (void*)object);
+  mesche_value_print(OBJECT_VAL(object));
+  printf("\n");
+  #endif
+
+  switch (object->kind) {
+  case ObjectKindClosure: {
+    ObjectClosure *closure = (ObjectClosure*)object;
+    mesche_mem_mark_object(vm, (Object*)closure->function);
+    for (int i = 0; i < closure->upvalue_count; i++) {
+      mesche_mem_mark_object(vm, (Object*)closure->upvalues[i]);
+    }
+    break;
+  }
+  case ObjectKindFunction: {
+    ObjectFunction *function = (ObjectFunction*)object;
+    mesche_mem_mark_object(vm, (Object*)function->name);
+    mem_mark_array(vm, &function->chunk.constants);
+    break;
+  }
+  case ObjectKindUpvalue:
+    mem_mark_value(vm, ((ObjectUpvalue*)object)->closed);
+    break;
+  default: break;
+  }
+}
+
+static void mem_trace_references(MescheMemory *mem) {
+  VM *vm = (VM*)mem;
+
+  // Loop through the stack (which may get more entries added during the loop)
+  // to darken all marked objects
+  while (vm->gray_count > 0) {
+    Object *object = vm->gray_stack[--vm->gray_count];
+    mem_darken_object(vm, object);
+  }
+}
+
+static void mem_table_remove_white(Table *table) {
+  for (int i = 0; i < table->capacity; i++) {
+    Entry *entry = &table->entries[i];
+    if (entry->key != NULL && !entry->key->object.is_marked) {
+      mesche_table_delete(table, entry->key);
+    }
+  }
+}
+
+static void mem_sweep_objects(VM *vm) {
+  Object *previous = NULL;
+  Object *object = vm->objects;
+
+  // Walk through the object linked list
+  while (object != NULL) {
+    // If the object is marked, move to the next object, retaining
+    // a pointer this one so that the next live object can be linked
+    // to it
+    if (object->is_marked) {
+      object->is_marked = false; // Seeya next time...
+      previous = object;
+      object = object->next;
+    } else {
+      // If the object is unmarked, remove it from the linked list
+      // and free it
+      Object *unreached = object;
+      object = object->next;
+      if (previous != NULL) {
+        previous->next = object;
+      } else {
+        vm->objects = object;
+      }
+
+      mesche_object_free(vm, unreached);
+    }
+  }
+}
+
+static void mem_collect_garbage(MescheMemory *mem) {
+  VM *vm = (VM*)mem;
+  mem_mark_roots(vm);
+  if (vm->current_compiler != NULL) {
+    mesche_compiler_mark_roots(vm->current_compiler);
+  }
+  mem_trace_references(vm);
+  mem_table_remove_white(&vm->strings);
+  mem_sweep_objects(vm);
+}
+
 void mesche_vm_init(VM *vm) {
+  // initialize the memory manager
+  mesche_mem_init(&vm->mem, mem_collect_garbage);
+
   vm->objects = NULL;
+  vm->current_compiler = NULL;
   vm_reset_stack(vm);
   mesche_table_init(&vm->strings);
   mesche_table_init(&vm->globals);
+
+  // Initialize the grya stack
+  vm->gray_count = 0;
+  vm->gray_capacity = 0;
+  vm->gray_stack = NULL;
 }
 
 void mesche_vm_free(VM *vm) {
-  mesche_table_free(&vm->strings);
-  mesche_table_free(&vm->globals);
+  mesche_table_free((MescheMemory *)vm, &vm->strings);
+  mesche_table_free((MescheMemory *)vm, &vm->globals);
   vm_reset_stack(vm);
   vm_free_objects(vm);
 }
@@ -97,7 +268,7 @@ static bool vm_call_value(VM *vm, Value callee, uint8_t arg_count) {
     case ObjectKindNativeFunction: {
       FunctionPtr func_ptr = AS_NATIVE_FUNC(callee);
       Value result = func_ptr(arg_count, vm->stack_top - arg_count);
-      vm_stack_push(vm, result);
+      mesche_vm_stack_push(vm, result);
       return true;
     }
     default:
@@ -173,9 +344,9 @@ InterpretResult mesche_vm_run(VM *vm) {
       vm_runtime_error(vm, "Operands must be numbers.");                                           \
       return INTERPRET_RUNTIME_ERROR;                                                              \
     }                                                                                              \
-    double b = cast(vm_stack_pop(vm));                                                             \
-    double a = cast(vm_stack_pop(vm));                                                             \
-    vm_stack_push(vm, value_type(a op b));                                                         \
+    double b = cast(mesche_vm_stack_pop(vm));                                                             \
+    double a = cast(mesche_vm_stack_pop(vm));                                                             \
+    mesche_vm_stack_push(vm, value_type(a op b));                                                         \
   } while (false)
 
   for (;;) {
@@ -203,26 +374,26 @@ InterpretResult mesche_vm_run(VM *vm) {
     switch (instr = READ_BYTE()) {
     case OP_CONSTANT:
       value = READ_CONSTANT();
-      vm_stack_push(vm, value);
+      mesche_vm_stack_push(vm, value);
       break;
     case OP_NIL:
-      vm_stack_push(vm, NIL_VAL);
+      mesche_vm_stack_push(vm, NIL_VAL);
       break;
     case OP_T:
-      vm_stack_push(vm, T_VAL);
+      mesche_vm_stack_push(vm, T_VAL);
       break;
     case OP_POP:
-      vm_stack_pop(vm);
+      mesche_vm_stack_pop(vm);
       break;
     case OP_POP_SCOPE: {
       // Only start popping if we have locals to clear
       uint8_t local_count = READ_BYTE();
       if (local_count > 0) {
-        Value result = vm_stack_pop(vm);
+        Value result = mesche_vm_stack_pop(vm);
         for (int i = 0; i < local_count; i++) {
-          vm_stack_pop(vm);
+          mesche_vm_stack_pop(vm);
         }
-        vm_stack_push(vm, result);
+        mesche_vm_stack_push(vm, result);
       }
       break;
     }
@@ -245,14 +416,14 @@ InterpretResult mesche_vm_run(VM *vm) {
       BINARY_OP(BOOL_VAL, IS_ANY, AS_BOOL, ||);
       break;
     case OP_NOT:
-      vm_stack_push(vm, IS_NIL(vm_stack_pop(vm)) ? T_VAL : NIL_VAL);
+      mesche_vm_stack_push(vm, IS_NIL(mesche_vm_stack_pop(vm)) ? T_VAL : NIL_VAL);
       break;
     case OP_EQUAL:
       // Drop through for now
     case OP_EQV: {
-      Value b = vm_stack_pop(vm);
-      Value a = vm_stack_pop(vm);
-      vm_stack_push(vm, BOOL_VAL(mesche_value_equalp(a, b)));
+      Value b = mesche_vm_stack_pop(vm);
+      Value a = mesche_vm_stack_pop(vm);
+      mesche_vm_stack_push(vm, BOOL_VAL(mesche_value_equalp(a, b)));
       break;
     }
     case OP_JUMP:
@@ -267,7 +438,7 @@ InterpretResult mesche_vm_run(VM *vm) {
       break;
     case OP_RETURN:
       // Hold on to the function result value before we manipulate the stack
-      value = vm_stack_pop(vm);
+      value = mesche_vm_stack_pop(vm);
       vm->frame_count--;
 
       // Close out upvalues for any function locals that have been captured by
@@ -276,14 +447,14 @@ InterpretResult mesche_vm_run(VM *vm) {
 
       // If we're out of call frames, end execution
       if (vm->frame_count == 0) {
-        vm_stack_pop(vm);
+        mesche_vm_stack_pop(vm);
         return INTERPRET_OK;
       }
 
       // Restore the previous result value, call frame, and value stack pointer
       // before continuing execution
       vm->stack_top = frame->slots;
-      vm_stack_push(vm, value);
+      mesche_vm_stack_push(vm, value);
       frame = &vm->frames[vm->frame_count - 1];
       break;
     case OP_DISPLAY:
@@ -292,8 +463,7 @@ InterpretResult mesche_vm_run(VM *vm) {
       break;
     case OP_DEFINE_GLOBAL:
       name = READ_STRING();
-      mesche_table_set(&vm->globals, name, vm_stack_peek(vm, 0));
-      /* vm_stack_pop(vm); // Pop value after adding entry to avoid GC */
+      mesche_table_set((MescheMemory *)vm, &vm->globals, name, vm_stack_peek(vm, 0));
       break;
     case OP_READ_GLOBAL:
       name = READ_STRING();
@@ -301,26 +471,25 @@ InterpretResult mesche_vm_run(VM *vm) {
         vm_runtime_error(vm, "Undefined variable '%s'.", name->chars);
         return INTERPRET_RUNTIME_ERROR;
       }
-      vm_stack_push(vm, value);
+      mesche_vm_stack_push(vm, value);
       break;
     case OP_READ_UPVALUE:
       // TODO: The problem here is that the local is no longer on the stack!
       // I'm using POP_SCOPE to get rid of all the locals but maybe the pointer
       // no longer works?  It's pointing to the location of the result of the function
       slot = READ_BYTE();
-      vm_stack_push(vm, *frame->closure->upvalues[slot]->location);
+      mesche_vm_stack_push(vm, *frame->closure->upvalues[slot]->location);
       break;
     case OP_READ_LOCAL:
       slot = READ_BYTE();
-      vm_stack_push(vm, frame->slots[slot]);
+      mesche_vm_stack_push(vm, frame->slots[slot]);
       break;
     case OP_SET_GLOBAL:
       name = READ_STRING();
-      if (mesche_table_set(&vm->globals, name, vm_stack_peek(vm, 0))) {
+      if (mesche_table_set((MescheMemory *)vm, &vm->globals, name, vm_stack_peek(vm, 0))) {
         vm_runtime_error(vm, "Undefined variable '%s'.", name->chars);
         return INTERPRET_RUNTIME_ERROR;
       }
-      /* vm_stack_pop(vm); */
       break;
     case OP_SET_UPVALUE:
       slot = READ_BYTE();
@@ -343,7 +512,7 @@ InterpretResult mesche_vm_run(VM *vm) {
     case OP_CLOSURE: {
       ObjectFunction *function = AS_FUNCTION(READ_CONSTANT());
       ObjectClosure *closure = mesche_object_make_closure(vm, function);
-      vm_stack_push(vm, OBJECT_VAL(closure));
+      mesche_vm_stack_push(vm, OBJECT_VAL(closure));
 
       for (int i = 0; i < closure->upvalue_count; i++) {
         // If the upvalue is a local, capture it explicitly.  Otherwise,
@@ -368,9 +537,9 @@ InterpretResult mesche_vm_run(VM *vm) {
       vm_close_upvalues(vm, vm->stack_top - 2);
 
       // Move the result value into the local's spot
-      Value result = vm_stack_pop(vm);
-      vm_stack_pop(vm);
-      vm_stack_push(vm, result);
+      Value result = mesche_vm_stack_pop(vm);
+      mesche_vm_stack_pop(vm);
+      mesche_vm_stack_push(vm, result);
 
       break;
     }
@@ -399,13 +568,13 @@ static Value mesche_vm_clock_native(int arg_count, Value *args) {
 
 void mesche_vm_define_native(VM *vm, const char *name, FunctionPtr function) {
   // Create objects for the name and the function
-  vm_stack_push(vm, OBJECT_VAL(mesche_object_make_string(vm, name, (int)strlen(name))));
-  vm_stack_push(vm, OBJECT_VAL(mesche_object_make_native_function(vm, function)));
+  mesche_vm_stack_push(vm, OBJECT_VAL(mesche_object_make_string(vm, name, (int)strlen(name))));
+  mesche_vm_stack_push(vm, OBJECT_VAL(mesche_object_make_native_function(vm, function)));
 
   // Add the item to the table and pop them back out
-  mesche_table_set(&vm->globals, AS_STRING(*(vm->stack_top - 2)), *(vm->stack_top - 1));
-  vm_stack_pop(vm);
-  vm_stack_pop(vm);
+  mesche_table_set((MescheMemory *)vm, &vm->globals, AS_STRING(*(vm->stack_top - 2)), *(vm->stack_top - 1));
+  mesche_vm_stack_pop(vm);
+  mesche_vm_stack_pop(vm);
 }
 
 InterpretResult mesche_vm_eval_string(VM *vm, const char *script_string) {
@@ -415,10 +584,10 @@ InterpretResult mesche_vm_eval_string(VM *vm, const char *script_string) {
   }
 
   // Push the top-level function as a closure
-  vm_stack_push(vm, OBJECT_VAL(function));
+  mesche_vm_stack_push(vm, OBJECT_VAL(function));
   ObjectClosure *closure = mesche_object_make_closure(vm, function);
-  vm_stack_pop(vm);
-  vm_stack_push(vm, OBJECT_VAL(closure));
+  mesche_vm_stack_pop(vm);
+  mesche_vm_stack_push(vm, OBJECT_VAL(closure));
 
   // Call the initial closure
   vm_call(vm, closure, 0);

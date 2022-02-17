@@ -43,6 +43,9 @@ int main(int argc, char **argv) {
     mesche_vm_eval_string(&vm, script_source);
     printf("\n");
 
+    // Report the final memory allocation statistics
+    mesche_mem_report((MescheMemory*)&vm);
+
     // Free the VM and allocated source string
     mesche_vm_free(&vm);
     free((void *)script_source);

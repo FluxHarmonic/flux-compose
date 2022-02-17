@@ -12,8 +12,8 @@ void mesche_table_init(Table *table) {
   table->entries = NULL;
 }
 
-void mesche_table_free(Table *table) {
-  FREE_ARRAY(Entry, table->entries, table->capacity);
+void mesche_table_free(MescheMemory *mem, Table *table) {
+  FREE_ARRAY(mem, Entry, table->entries, table->capacity);
 }
 
 static Entry *table_find_entry(Entry *entries, int capacity, ObjectString *key) {
@@ -44,9 +44,9 @@ static Entry *table_find_entry(Entry *entries, int capacity, ObjectString *key) 
   }
 }
 
-static void table_adjust_capacity(Table *table, int capacity) {
+static void table_adjust_capacity(MescheMemory *mem, Table *table, int capacity) {
   // Allocate and initialize the new array
-  Entry *entries = mesche_mem_realloc(NULL, 0, sizeof(Entry) * capacity);
+  Entry *entries = mesche_mem_realloc(mem, NULL, 0, sizeof(Entry) * capacity);
   for (int i = 0; i < capacity; i++) {
     entries[i].key = NULL;
     entries[i].value = NIL_VAL;
@@ -69,16 +69,16 @@ static void table_adjust_capacity(Table *table, int capacity) {
   }
 
   // Free the old table array
-  FREE_ARRAY(Entry, table->entries, table->capacity);
+  FREE_ARRAY(mem, Entry, table->entries, table->capacity);
 
   table->entries = entries;
   table->capacity = capacity;
 }
 
-bool mesche_table_set(Table *table, ObjectString *key, Value value) {
+bool mesche_table_set(MescheMemory *mem, Table *table, ObjectString *key, Value value) {
   if (table->count + 1 > table->capacity * TABLE_MAX_LOAD) {
     int capacity = GROW_CAPACITY(table->capacity);
-    table_adjust_capacity(table, capacity);
+    table_adjust_capacity(mem, table, capacity);
   }
 
   Entry *entry = table_find_entry(table->entries, table->capacity, key);
@@ -119,11 +119,11 @@ bool mesche_table_delete(Table *table, ObjectString *key) {
   return true;
 }
 
-void mesche_table_copy(Table *from, Table *to) {
+void mesche_table_copy(MescheMemory *mem, Table *from, Table *to) {
   for (int i = 0; i < from->capacity; i++) {
     Entry *entry = &from->entries[i];
     if (entry->key != NULL) {
-      mesche_table_set(to, entry->key, entry->value);
+      mesche_table_set(mem, to, entry->key, entry->value);
     }
   }
 }

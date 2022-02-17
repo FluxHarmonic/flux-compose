@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "vm.h"
+#include "mem.h"
 #include "op.h"
 #include "util.h"
 #include "chunk.h"
@@ -16,6 +17,8 @@
 // NOTE: Enable this for diagnostic purposes
 #define DEBUG_PRINT_CODE
 
+// Contains context for parsing tokens irrespective of the current compilation
+// scope
 typedef struct {
   Token current;
   Token previous;
@@ -23,21 +26,25 @@ typedef struct {
   bool panic_mode;
 } Parser;
 
+// Stores details relating to a local variable binding in a scope
 typedef struct {
   Token name;
   int depth;
   bool is_captured;
 } Local;
 
+// Stores details relating to a captured variable in a parent scope
 typedef struct {
   uint8_t index;
   bool is_local;
 } Upvalue;
 
+// Stores context for compilation at a particular scope
 typedef struct CompilerContext {
   struct CompilerContext *parent;
 
   VM *vm;
+  MescheMemory *mem;
   Parser *parser;
   Scanner *scanner;
 
@@ -50,6 +57,15 @@ typedef struct CompilerContext {
   Upvalue upvalues[UINT8_COUNT];
 } CompilerContext;
 
+void mesche_compiler_mark_roots(void *target) {
+  CompilerContext *ctx = (CompilerContext*)target;
+
+  while (ctx != NULL) {
+    mesche_mem_mark_object(ctx->vm, (Object*)ctx->function);
+    ctx = ctx->parent;
+  }
+}
+
 static void compiler_init_context(CompilerContext *ctx, CompilerContext *parent, FunctionType type) {
   if (parent != NULL) {
     ctx->parent = parent;
@@ -60,10 +76,15 @@ static void compiler_init_context(CompilerContext *ctx, CompilerContext *parent,
 
   // TODO: Assert if VM isn't set yet!  Should only happen at top-level scope.
 
+  // Set up the compiler state for this scope
   ctx->function = mesche_object_make_function(ctx->vm, type);
   ctx->function_type = type;
   ctx->local_count = 0;
   ctx->scope_depth = 0;
+
+  // Set up memory management
+  ctx->vm->current_compiler = ctx;
+  ctx->mem = &ctx->vm->mem;
 
   // Establish the first local slot
   Local *local = &ctx->locals[ctx->local_count++];
@@ -74,7 +95,7 @@ static void compiler_init_context(CompilerContext *ctx, CompilerContext *parent,
 }
 
 static void compiler_emit_byte(CompilerContext *ctx, uint8_t byte) {
-  mesche_chunk_write(&ctx->function->chunk, byte, ctx->parser->previous.line);
+  mesche_chunk_write(ctx->mem, &ctx->function->chunk, byte, ctx->parser->previous.line);
 }
 
 static void compiler_emit_bytes(CompilerContext *ctx, uint8_t byte1, uint8_t byte2) {
@@ -100,7 +121,8 @@ static ObjectFunction *compiler_end(CompilerContext *ctx) {
 }
 
 static uint8_t compiler_make_constant(CompilerContext *ctx, Value value) {
-  int constant = mesche_chunk_constant_add(&ctx->function->chunk, value);
+  int constant = mesche_chunk_constant_add(ctx->mem, &ctx->function->chunk, value);
+
   // TODO: We'll want to make sure we have at least 16 bits for constants
   if (constant > UINT8_MAX) {
     PANIC("Too many constants in one chunk!\n");
@@ -293,12 +315,23 @@ static uint8_t compiler_parse_symbol(CompilerContext *ctx) {
   compiler_declare_variable(ctx);
   if (ctx->scope_depth > 0) return 0;
 
-  // TODO: Find the index of an existing constant for the same symbol!
-  return
-    compiler_make_constant(ctx,
-                           OBJECT_VAL(mesche_object_make_string(ctx->vm,
-                                                                ctx->parser->previous.start,
-                                                                ctx->parser->previous.length)));
+  Value new_string = OBJECT_VAL(mesche_object_make_string(ctx->vm,
+                                                          ctx->parser->previous.start,
+                                                          ctx->parser->previous.length));
+
+  // Reuse an existing constant for the same string if possible
+  uint8_t constant = 0;
+  bool value_found = false;
+  Chunk *chunk = &ctx->function->chunk;
+  for (int i = 0; i < chunk->constants.count; i++) {
+    if (mesche_value_equalp(chunk->constants.values[i], new_string)) {
+      constant = i;
+      value_found = true;
+      break;
+    }
+  }
+
+  return value_found ? constant : compiler_make_constant(ctx, new_string);
 }
 
 static void compiler_parse_identifier(CompilerContext *ctx) {
@@ -436,7 +469,6 @@ static void compiler_parse_lambda(CompilerContext *ctx) {
 
   // Parse body
   compiler_parse_block(&func_ctx, true);
-  fflush(stdout);
 
   // Get the parsed function and store it in a constant
   ObjectFunction *function = compiler_end(&func_ctx);
@@ -447,6 +479,9 @@ static void compiler_parse_lambda(CompilerContext *ctx) {
     compiler_emit_byte(ctx, func_ctx.upvalues[i].is_local ? 1 : 0);
     compiler_emit_byte(ctx, func_ctx.upvalues[i].index);
   }
+
+  // Let the VM know we're back to the parent compiler
+  ctx->vm->current_compiler = ctx;
 }
 
 static int compiler_emit_jump(CompilerContext *ctx, uint8_t instruction) {
@@ -667,6 +702,9 @@ ObjectFunction *mesche_compile_source(VM *vm, const char *script_source) {
   compiler_advance(&ctx);
   compiler_parse_block(&ctx, false);
   compiler_consume(&ctx, TokenKindEOF, "Expected end of expression.");
+
+  // Clear the VM's pointer to this compiler
+  vm->current_compiler = NULL;
 
   // Retrieve the final function and return it if there were no parse errors
   ObjectFunction *function = compiler_end(&ctx);
