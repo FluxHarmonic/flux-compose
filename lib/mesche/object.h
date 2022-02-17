@@ -1,1 +1,0 @@
-VALUE_OBJECT
