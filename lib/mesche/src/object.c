@@ -132,10 +132,12 @@ void mesche_object_free(Object *object) {
     FREE(ObjectFunction, object);
     break;
   case ObjectKindClosure:
-    ObjectClosure *closure = (ObjectClosure*)object;
-    FREE_ARRAY(ObjectUpvalue *, closure->upvalues, closure->upvalue_count);
-    FREE(ObjectFunction, object);
-    break;
+    {
+      ObjectClosure *closure = (ObjectClosure*)object;
+      FREE_ARRAY(ObjectUpvalue *, closure->upvalues, closure->upvalue_count);
+      FREE(ObjectFunction, object);
+      break;
+    }
   case ObjectKindNativeFunction:
     FREE(ObjectNativeFunction, object);
     break;
