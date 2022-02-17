@@ -1,8 +1,7 @@
-(define outer
-  (lambda ()
-    (let ((x "Go! "))
-      (lambda ()
-        (display x)))))
+(define (outer)
+  (let ((x "Go! "))
+    (lambda ()
+      (display x))))
 
 (define inner (outer))
 

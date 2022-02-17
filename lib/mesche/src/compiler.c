@@ -359,17 +359,6 @@ static void compiler_define_variable(CompilerContext *ctx, uint8_t variable_cons
   compiler_emit_bytes(ctx, OP_DEFINE_GLOBAL, variable_constant);
 }
 
-static void compiler_parse_define(CompilerContext *ctx) {
-  compiler_consume(ctx, TokenKindSymbol, "Expected symbol after 'define'");
-
-  // TODO: Only allow defines at the top of let/lambda bodies
-  uint8_t variable_constant = compiler_parse_symbol(ctx);
-  compiler_parse_expr(ctx);
-  compiler_define_variable(ctx, variable_constant);
-
-  compiler_consume(ctx, TokenKindRightParen, "Expected closing paren.");
-}
-
 static void compiler_parse_set(CompilerContext *ctx) {
   compiler_consume(ctx, TokenKindSymbol, "Expected symbol after 'set!'");
 
@@ -439,14 +428,12 @@ static void compiler_parse_let(CompilerContext *ctx) {
   compiler_end_scope(ctx);
 }
 
-static void compiler_parse_lambda(CompilerContext *ctx) {
+static void compiler_parse_lambda_inner(CompilerContext *ctx) {
   // Create a new compiler context for parsing the function body
   CompilerContext func_ctx;
   compiler_init_context(&func_ctx, ctx, TYPE_FUNCTION);
   compiler_begin_scope(&func_ctx);
 
-  // Parse argument list
-  compiler_consume(&func_ctx, TokenKindLeftParen, "Expected left paren to begin argument list.");
   for (;;) {
     // Try to parse each argument until we reach a closing paren
     if (func_ctx.parser->current.kind == TokenKindRightParen) {
@@ -484,7 +471,39 @@ static void compiler_parse_lambda(CompilerContext *ctx) {
   ctx->vm->current_compiler = ctx;
 }
 
+static void compiler_parse_lambda(CompilerContext *ctx) {
+  // Consume the leading paren and let the shared lambda parser take over
+  compiler_consume(ctx, TokenKindLeftParen, "Expected left paren to begin argument list.");
+  compiler_parse_lambda_inner(ctx);
+}
+
+static void compiler_parse_define(CompilerContext *ctx) {
+  // The next symbol should either be a symbol or an open paren to define a function
+  bool is_func = false;
+  if (ctx->parser->current.kind == TokenKindLeftParen) {
+    compiler_consume(ctx, TokenKindLeftParen, "Expected left paren after 'define'");
+    is_func = true;
+  }
+
+  compiler_consume(ctx, TokenKindSymbol, "Expected symbol after 'define'");
+
+  uint8_t variable_constant = variable_constant = compiler_parse_symbol(ctx);
+  if (is_func) {
+    // Let the lambda parser take over
+    compiler_parse_lambda_inner(ctx);
+  } else {
+    // Parse a normal expression
+    compiler_parse_expr(ctx);
+    compiler_consume(ctx, TokenKindRightParen, "Expected closing paren.");
+  }
+
+  // TODO: Only allow defines at the top of let/lambda bodies
+  compiler_define_variable(ctx, variable_constant);
+}
+
 static int compiler_emit_jump(CompilerContext *ctx, uint8_t instruction) {
+  // Write out the two bytes that will be patched once the jump target location
+  // is determined
   compiler_emit_byte(ctx, instruction);
   compiler_emit_byte(ctx, 0xff);
   compiler_emit_byte(ctx, 0xff);
