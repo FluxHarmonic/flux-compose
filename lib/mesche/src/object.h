@@ -11,13 +11,16 @@
 #define OBJECT_VAL(value) ((Value){VALUE_OBJECT, {.object = (Object*)value}})
 #define OBJECT_KIND(value) (AS_OBJECT(value)->kind)
 
-#define IS_FUNCTION(value) object_is_kind(value, ObjectKindFunction)
+#define IS_FUNCTION(value) mesche_object_is_kind(value, ObjectKindFunction)
 #define AS_FUNCTION(value) ((ObjectFunction *)AS_OBJECT(value))
 
-#define IS_CLOSURE(value) object_is_kind(value, ObjectKindClosure)
+#define IS_KEYWORD(value) mesche_object_is_kind(value, ObjectKindKeyword)
+#define AS_KEYWORD(value) ((ObjectKeyword *)AS_OBJECT(value))
+
+#define IS_CLOSURE(value) mesche_object_is_kind(value, ObjectKindClosure)
 #define AS_CLOSURE(value) ((ObjectClosure *)AS_OBJECT(value))
 
-#define IS_NATIVE_FUNC(value) object_is_kind(value, ObjectKindNativeFunction)
+#define IS_NATIVE_FUNC(value) mesche_object_is_kind(value, ObjectKindNativeFunction)
 #define AS_NATIVE_FUNC(value) (((ObjectNativeFunction *)AS_OBJECT(value))->function)
 
 #define AS_STRING(value) ((ObjectString *)AS_OBJECT(value))
@@ -46,6 +49,11 @@ struct ObjectString {
   char chars[];
 };
 
+struct ObjectKeyword {
+  // A keyword is basically a tagged string
+  struct ObjectString string;
+};
+
 struct ObjectSymbol {
   struct Object object;
   uint32_t hash;
@@ -58,12 +66,24 @@ typedef enum {
   TYPE_SCRIPT
 } FunctionType;
 
+typedef struct {
+  ObjectString *name;
+  uint8_t default_index;
+} KeywordArgument;
+
+typedef struct {
+  int capacity;
+  int count;
+  KeywordArgument *args;
+} KeywordArgumentArray;
+
 struct ObjectFunction {
   Object object;
   FunctionType type;
   int arity;
   int upvalue_count;
   Chunk chunk;
+  KeywordArgumentArray keyword_args;
   ObjectString *name;
 };
 
@@ -87,12 +107,17 @@ typedef struct {
 } ObjectNativeFunction;
 
 ObjectString *mesche_object_make_string(VM *vm, const char *chars, int length);
+ObjectKeyword *mesche_object_make_keyword(VM *vm, const char *chars, int length);
 ObjectUpvalue *mesche_object_make_upvalue(VM *vm, Value *slot);
 ObjectFunction *mesche_object_make_function(VM *vm, FunctionType type);
+void mesche_object_function_keyword_add(MescheMemory *mem, ObjectFunction *function, KeywordArgument keyword_arg);
 ObjectClosure *mesche_object_make_closure(VM *vm, ObjectFunction *function);
 ObjectNativeFunction *mesche_object_make_native_function(VM *vm, FunctionPtr function);
 
 void mesche_object_free(VM *vm, struct Object *object);
 void mesche_object_print(Value value);
+
+bool mesche_object_is_kind(Value value, ObjectKind kind);
+bool mesche_object_string_equalsp(Object *left, Object *right);
 
 #endif

@@ -191,6 +191,33 @@ static void compiler_consume(CompilerContext *ctx, TokenKind kind, const char *m
 // Predefine the main parser function
 static void compiler_parse_expr(CompilerContext *ctx);
 
+static void compiler_parse_number(CompilerContext *ctx) {
+  double value = strtod(ctx->parser->previous.start, NULL);
+  compiler_emit_constant(ctx, NUMBER_VAL(value));
+}
+
+static void compiler_parse_string(CompilerContext *ctx) {
+  compiler_emit_constant(ctx,
+                         OBJECT_VAL(mesche_object_make_string(ctx->vm,
+                                                              ctx->parser->previous.start + 1,
+                                                              ctx->parser->previous.length - 2)));
+}
+
+static void compiler_parse_keyword(CompilerContext *ctx) {
+  compiler_emit_constant(ctx,
+                         OBJECT_VAL(mesche_object_make_keyword(ctx->vm,
+                                                               ctx->parser->previous.start + 1,
+                                                               ctx->parser->previous.length - 1)));
+}
+
+static void compiler_parse_literal(CompilerContext *ctx) {
+  switch (ctx->parser->previous.kind) {
+  case TokenKindNil: compiler_emit_byte(ctx, OP_NIL); break;
+  case TokenKindTrue: compiler_emit_byte(ctx, OP_T); break;
+  default: return; // We shouldn't hit this
+  }
+}
+
 static void compiler_parse_block(CompilerContext *ctx, bool expect_end_paren) {
   // TODO: Discard every value except for the last!
   for (;;) {
@@ -434,6 +461,7 @@ static void compiler_parse_lambda_inner(CompilerContext *ctx) {
   compiler_init_context(&func_ctx, ctx, TYPE_FUNCTION);
   compiler_begin_scope(&func_ctx);
 
+  bool in_keyword_list = false;
   for (;;) {
     // Try to parse each argument until we reach a closing paren
     if (func_ctx.parser->current.kind == TokenKindRightParen) {
@@ -441,17 +469,53 @@ static void compiler_parse_lambda_inner(CompilerContext *ctx) {
       break;
     }
 
-    // Increase the function argument count (arity)
-    func_ctx.function->arity++;
-    if (func_ctx.function->arity > 255) {
-      compiler_error_at_current(&func_ctx, "Function cannot have more than 255 parameters.");
+    if (func_ctx.parser->current.kind == TokenKindKeyword) {
+      compiler_consume(&func_ctx, TokenKindKeyword, "Expected :keys keyword to start keyword list.");
+      in_keyword_list = true;
     }
 
-    // Parse the argument
-    // TODO: Ensure a symbol comes next
-    compiler_advance(&func_ctx);
-    uint8_t constant = compiler_parse_symbol(&func_ctx);
-    compiler_define_variable(&func_ctx, constant);
+    if (!in_keyword_list) {
+      // Increase the function argument count (arity)
+      func_ctx.function->arity++;
+      if (func_ctx.function->arity > 255) {
+        compiler_error_at_current(&func_ctx, "Function cannot have more than 255 parameters.");
+      }
+
+      // Parse the argument
+      // TODO: Ensure a symbol comes next
+      compiler_advance(&func_ctx);
+      uint8_t constant = compiler_parse_symbol(&func_ctx);
+      compiler_define_variable(&func_ctx, constant);
+    } else {
+      compiler_advance(&func_ctx);
+
+      // Check if there is a default value pair
+      bool has_default = false;
+      if (func_ctx.parser->current.kind == TokenKindLeftParen) {
+        compiler_advance(&func_ctx);
+        has_default = true;
+      }
+
+      // Parse the keyword name and define it as a local variable
+      uint8_t constant = compiler_parse_symbol(&func_ctx);
+      compiler_define_variable(&func_ctx, constant);
+
+      // Parse the default if we're expecting one
+      uint8_t default_constant = 0;
+      if (has_default) {
+        compiler_consume(&func_ctx, TokenKindRightParen, "Expected right paren after keyword default value.");
+      }
+
+      // Add the keyword definition to the function
+      KeywordArgument keyword_arg = {
+        .name = mesche_object_make_string(ctx->vm,
+                                          ctx->parser->previous.start,
+                                          ctx->parser->previous.length),
+        .default_index = default_constant
+      };
+
+      mesche_object_function_keyword_add(ctx->mem, func_ctx.function, keyword_arg);
+    }
   }
 
   // Parse body
@@ -611,6 +675,7 @@ static void compiler_parse_list(CompilerContext *ctx) {
 
   // Parse argument expressions until we reach a right paren
   uint8_t arg_count = 0;
+  bool in_keyword_args = false;
   for (;;) {
     // Bail out when we hit the closing parentheses
     if (ctx->parser->current.kind == TokenKindRightParen) {
@@ -627,8 +692,22 @@ static void compiler_parse_list(CompilerContext *ctx) {
       return;
     }
 
-    // Compile next operand
-    compiler_parse_expr(ctx);
+    // Is it a keyword argument?
+    if (!in_keyword_args && ctx->parser->current.kind == TokenKindKeyword) {
+      // We're only looking for keyword arguments from this point on
+      in_keyword_args = true;
+    }
+
+    if (in_keyword_args) {
+      // Parse the keyword and value
+      compiler_consume(ctx, TokenKindKeyword, "Expected keyword.");
+      compiler_parse_keyword(ctx);
+      compiler_parse_expr(ctx);
+      arg_count++; // Add one more argument for the value we just parsed
+    } else {
+      // Compile next positional parameter
+      compiler_parse_expr(ctx);
+    }
 
     if (arg_count == 255) {
       compiler_error(ctx, "Cannot pass more than 255 arguments in a function call.");
@@ -639,26 +718,6 @@ static void compiler_parse_list(CompilerContext *ctx) {
 }
 
 void (*ParserFunc)(CompilerContext *ctx);
-
-static void compiler_parse_number(CompilerContext *ctx) {
-  double value = strtod(ctx->parser->previous.start, NULL);
-  compiler_emit_constant(ctx, NUMBER_VAL(value));
-}
-
-static void compiler_parse_string(CompilerContext *ctx) {
-  compiler_emit_constant(ctx,
-                         OBJECT_VAL(mesche_object_make_string(ctx->vm,
-                                                              ctx->parser->previous.start + 1,
-                                                              ctx->parser->previous.length - 2)));
-}
-
-static void compiler_parse_literal(CompilerContext *ctx) {
-  switch (ctx->parser->previous.kind) {
-  case TokenKindNil: compiler_emit_byte(ctx, OP_NIL); break;
-  case TokenKindTrue: compiler_emit_byte(ctx, OP_T); break;
-  default: return; // We shouldn't hit this
-  }
-}
 
 static void compiler_parse_expr(CompilerContext *ctx) {
   /* static const ParserFunc[TokenKindEOF] = [NULL, */

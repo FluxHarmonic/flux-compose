@@ -14,10 +14,6 @@
 #define ALLOC_OBJECT_EX(vm, type, extra_size, object_kind)  \
   (type *)object_allocate(vm, sizeof(type) + extra_size, object_kind)
 
-static inline bool object_is_kind(Value value, ObjectKind kind) {
-  return IS_OBJECT(value) && AS_OBJECT(value)->kind == kind;
-}
-
 static Object* object_allocate(VM *vm, size_t size, ObjectKind kind) {
   Object *object = (Object*)mesche_mem_realloc((MescheMemory *)vm, NULL, 0, size);
   object->kind = kind;
@@ -70,6 +66,19 @@ ObjectString *mesche_object_make_string(VM *vm, const char *chars, int length) {
   return string;
 }
 
+ObjectKeyword *mesche_object_make_keyword(VM *vm, const char *chars, int length) {
+  // TODO: Do we want to intern keyword strings too?
+  // Allocate and initialize the string object
+  uint32_t hash = object_string_hash(chars, length);
+  ObjectString *keyword = ALLOC_OBJECT_EX(vm, ObjectKeyword, length + 1, ObjectKindKeyword);
+  memcpy(keyword->chars, chars, length);
+  keyword->chars[length + 1] = '\0';
+  keyword->length = length;
+  keyword->hash = hash;
+
+  return (ObjectKeyword*)keyword;
+}
+
 ObjectString *mesche_object_make_symbol(VM *vm, const char *chars, int length) {
   // Is the string already interned?
   uint32_t hash = object_string_hash(chars, length);
@@ -97,12 +106,37 @@ ObjectUpvalue *mesche_object_make_upvalue(VM *vm, Value *slot) {
   return upvalue;
 }
 
+static void function_keyword_args_init(KeywordArgumentArray *array) {
+  array->count = 0;
+  array->capacity = 0;
+  array->args = NULL;
+}
+
+static void function_keyword_args_free(MescheMemory *mem, KeywordArgumentArray* array) {
+  FREE_ARRAY(mem, Value, array->args, array->capacity);
+  function_keyword_args_init(array);
+}
+
+void mesche_object_function_keyword_add(MescheMemory *mem, ObjectFunction *function, KeywordArgument keyword_arg) {
+  KeywordArgumentArray *array = &function->keyword_args;
+  if (array->capacity < array->count + 1) {
+    int old_capacity = array->capacity;
+    array->capacity = GROW_CAPACITY(old_capacity);
+    array->args = GROW_ARRAY(mem, KeywordArgument, array->args, old_capacity, array->capacity);
+  }
+
+  array->args[array->count] = keyword_arg;
+  array->count++;
+}
+
+
 ObjectFunction *mesche_object_make_function(VM *vm, FunctionType type) {
   ObjectFunction *function = ALLOC_OBJECT(vm, ObjectFunction, ObjectKindFunction);
   function->arity = 0;
   function->upvalue_count = 0;
   function->type = type;
   function->name = NULL;
+  function_keyword_args_init(&function->keyword_args);
   mesche_chunk_init(&function->chunk);
 
   return function;
@@ -129,8 +163,6 @@ ObjectNativeFunction *mesche_object_make_native_function(VM *vm, FunctionPtr fun
 }
 
 void mesche_object_free(VM *vm, Object *object) {
-  ObjectString *string = NULL;
-
   #ifdef DEBUG_LOG_GC
   printf("%p    free   ", (void*)object);
   mesche_value_print(OBJECT_VAL(object));
@@ -138,10 +170,16 @@ void mesche_object_free(VM *vm, Object *object) {
   #endif
 
   switch (object->kind) {
-  case ObjectKindString:
-    string = (ObjectString*)object;
+  case ObjectKindString: {
+    ObjectString *string = (ObjectString*)object;
     FREE_SIZE(vm, string, (sizeof(ObjectString) + string->length + 1));
     break;
+  }
+  case ObjectKindKeyword: {
+    ObjectKeyword *keyword = (ObjectKeyword*)object;
+    FREE_SIZE(vm, keyword, (sizeof(ObjectKeyword) + keyword->string.length + 1));
+    break;
+  }
   case ObjectKindUpvalue:
     FREE(vm, ObjectUpvalue, object);
     break;
@@ -180,6 +218,9 @@ void mesche_object_print(Value value) {
   case ObjectKindString:
     printf("%s", AS_CSTRING(value));
     break;
+  case ObjectKindKeyword:
+    printf(":%s", AS_CSTRING(value));
+    break;
   case ObjectKindUpvalue:
     printf("upvalue");
     break;
@@ -193,4 +234,22 @@ void mesche_object_print(Value value) {
     printf("<native fn>");
     break;
   }
+}
+
+inline bool mesche_object_is_kind(Value value, ObjectKind kind) {
+  return IS_OBJECT(value) && AS_OBJECT(value)->kind == kind;
+}
+
+bool mesche_object_string_equalsp(Object *left, Object *right) {
+  if (!(left->kind == ObjectKindString || left->kind == ObjectKindKeyword) &&
+      !(right->kind == ObjectKindString || right->kind == ObjectKindKeyword)) {
+    return false;
+  }
+
+  ObjectString *left_str = (ObjectString *)left;
+  ObjectString *right_str = (ObjectString *)right;
+
+  return (left_str->length == right_str->length
+          && left_str->hash == right_str->hash
+          && memcmp(left_str->chars, right_str->chars, left_str->length) == 0);
 }

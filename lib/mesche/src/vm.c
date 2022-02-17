@@ -12,6 +12,7 @@
 #include "util.h"
 #include "value.h"
 #include "vm.h"
+#include "object.h"
 
 // NOTE: Enable this for diagnostic purposes
 /* #define DEBUG_TRACE_EXECUTION */
@@ -247,16 +248,79 @@ void mesche_vm_free(VM *vm) {
 }
 
 static bool vm_call(VM *vm, ObjectClosure *closure, uint8_t arg_count) {
-  // TODO: Update this to support varargs
-  if (arg_count != closure->function->arity) {
-    vm_runtime_error(vm, "Expected %d arguments but got %d.", closure->function->arity, arg_count);
-    return false;
+  // Need to factor in:
+  // - Required argument count (arity)
+  // - Number of keywords (check the value stack to match them)
+  Value *arg_start = vm->stack_top - arg_count;
+  if (closure->function->keyword_args.count > 0) {
+    // This is 15 keyword arguments and their values
+    Value stored_keyword_args[30];
+
+    // Find keyword arguments and copy them to temporary storage
+    int start_index = 0;
+    Value *keyword_start = NULL;
+    Value *keyword_current = arg_start;
+    for (int i = 0; i < arg_count; i++) {
+      if (keyword_start == NULL && IS_KEYWORD(*keyword_current)) {
+        keyword_start = keyword_current;
+        start_index = i;
+      }
+
+      if (keyword_start != NULL) {
+        // Copy the value to temporary storage
+        // TODO: Error if we've reached the storage max
+        stored_keyword_args[i - start_index] = *keyword_current;
+      }
+
+      keyword_current++;
+    }
+
+    // Reset the top of the stack to the location of the first keyword argument
+    vm->stack_top = keyword_start;
+
+    // Now that we know where keywords start in the value stack, push the
+    // keyword default values on so that they line up with the local variables
+    // we've defined
+    KeywordArgument *keyword_arg = closure->function->keyword_args.args;
+    for (int i = 0; i < closure->function->keyword_args.count; i++) {
+      // Check if the passed keyword args match this keyword
+      bool found_match = false;
+      for (int j = 0; j < arg_count - start_index; j += 2) {
+        if (mesche_object_string_equalsp(keyword_arg->name, (Object*)AS_KEYWORD(stored_keyword_args[j]))) {
+          // Put the value on the stack
+          mesche_vm_stack_push(vm, stored_keyword_args[j + 1]);
+          found_match = true;
+        }
+      }
+
+      // Skip to the next keyword if the previous had a match
+      if (found_match) {
+        keyword_arg++;
+        continue;
+      }
+
+      // Apply default value of keyword argument
+      if (keyword_arg->default_index > 0) {
+        mesche_vm_stack_push(vm, closure->function->chunk.constants.values[keyword_arg->default_index - 1]);
+      } else {
+        // If no default value was provided, choose `nil`
+        mesche_vm_stack_push(vm, NIL_VAL);
+      }
+
+      keyword_arg++;
+    }
+  } else {
+    if (arg_count != closure->function->arity) {
+      vm_runtime_error(vm, "Expected %d arguments but got %d.", closure->function->arity, arg_count);
+      return false;
+    }
+
   }
 
   CallFrame *frame = &vm->frames[vm->frame_count++];
   frame->closure = closure;
   frame->ip = closure->function->chunk.code;
-  frame->slots = vm->stack_top - arg_count - 1;
+  frame->slots = arg_start - 1;
   return true;
 }
 
@@ -276,7 +340,7 @@ static bool vm_call_value(VM *vm, Value callee, uint8_t arg_count) {
     }
   }
 
-  vm_runtime_error(vm, "Only functions can be called.");
+  vm_runtime_error(vm, "Only functions can be called (received kind %d)", OBJECT_KIND(callee));
   return false;
 }
 

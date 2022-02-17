@@ -1,0 +1,10 @@
+(define (keyword-test str :keys x y)
+  (display "X is ")
+  (display x)
+  (display " and Y is ")
+  (display y)
+  (display ". The string is: ")
+  (display str))
+
+(keyword-test "hello!" :x 3)
+(keyword-test "Hello again!" :x 5 :y 15)
