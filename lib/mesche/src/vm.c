@@ -82,7 +82,8 @@ void mesche_mem_mark_object(VM *vm, Object *object) {
 
   // Add the object to the gray stack if it has references to trace
   if (object->kind != ObjectKindString && object->kind != ObjectKindSymbol &&
-      object->kind != ObjectKindKeyword && object->kind != ObjectKindNativeFunction) {
+      object->kind != ObjectKindKeyword && object->kind != ObjectKindNativeFunction &&
+      object->kind != ObjectKindPointer) {
     // Resize the gray stack if necessary (tracks visited objects)
     if (vm->gray_capacity < vm->gray_count + 1) {
       vm->gray_capacity = GROW_CAPACITY(vm->gray_capacity);
@@ -143,6 +144,11 @@ static void mem_darken_object(VM *vm, Object *object) {
 #endif
 
   switch (object->kind) {
+  case ObjectKindCons: {
+    ObjectCons *cons = (ObjectCons *)object;
+    mem_mark_value(vm, cons->car);
+    mem_mark_value(vm, cons->cdr);
+  }
   case ObjectKindClosure: {
     ObjectClosure *closure = (ObjectClosure *)object;
     mesche_mem_mark_object(vm, (Object *)closure->function);
@@ -222,6 +228,7 @@ static void mem_collect_garbage(MescheMemory *mem) {
   }
   mem_trace_references(vm);
   mem_table_remove_white(&vm->strings);
+  mem_table_remove_white(&vm->symbols);
   mem_sweep_objects(vm);
 }
 
@@ -233,7 +240,7 @@ void mesche_vm_init(VM *vm) {
   vm->current_compiler = NULL;
   vm_reset_stack(vm);
   mesche_table_init(&vm->strings);
-  mesche_table_init(&vm->globals);
+  mesche_table_init(&vm->symbols);
 
   // Initialize the grya stack
   vm->gray_count = 0;
@@ -243,7 +250,8 @@ void mesche_vm_init(VM *vm) {
 
 void mesche_vm_free(VM *vm) {
   mesche_table_free((MescheMemory *)vm, &vm->strings);
-  mesche_table_free((MescheMemory *)vm, &vm->globals);
+  mesche_table_free((MescheMemory *)vm, &vm->symbols);
+  mesche_table_free((MescheMemory *)vm, &vm->modules);
   vm_reset_stack(vm);
   vm_free_objects(vm);
 }
@@ -464,6 +472,32 @@ InterpretResult mesche_vm_run(VM *vm) {
       }
       break;
     }
+    case OP_CONS: {
+      Value cdr = mesche_vm_stack_pop(vm);
+      Value car = mesche_vm_stack_pop(vm);
+      mesche_vm_stack_push(vm, OBJECT_VAL(mesche_object_make_cons(vm, car, cdr)));
+      break;
+    }
+    case OP_LIST: {
+      ObjectCons *list = NULL;
+      uint8_t item_count = READ_BYTE();
+      if (item_count == 0) {
+        mesche_vm_stack_push(vm, EMPTY_VAL);
+      } else {
+        // List values will be popped in reverse order, build the
+        // list back to front (great for cons pairs)
+        Value list_value;
+        for (int i = 0; i < item_count; i++) {
+          list_value = mesche_vm_stack_pop(vm);
+          list = mesche_object_make_cons(vm,
+                                         list_value,
+                                         list == NULL ? EMPTY_VAL : OBJECT_VAL(list));
+        }
+
+        mesche_vm_stack_push(vm, OBJECT_VAL(list));
+      }
+      break;
+    }
     case OP_ADD:
       BINARY_OP(NUMBER_VAL, IS_NUMBER, AS_NUMBER, +);
       break;
@@ -514,7 +548,9 @@ InterpretResult mesche_vm_run(VM *vm) {
 
       // If we're out of call frames, end execution
       if (vm->frame_count == 0) {
+        // Push the value back on so that it can be read by the REPL
         mesche_vm_stack_pop(vm);
+        mesche_vm_stack_push(vm, value);
         return INTERPRET_OK;
       }
 

@@ -49,6 +49,8 @@ int mesche_disasm_instr(Chunk *chunk, int offset) {
     return mesche_disasm_simple_instr("OP_NIL", offset);
   case OP_T:
     return mesche_disasm_simple_instr("OP_T", offset);
+  case OP_LIST:
+    return mesche_disasm_byte_instr("OP_LIST", chunk, offset);
   case OP_POP:
     return mesche_disasm_simple_instr("OP_POP", offset);
   case OP_POP_SCOPE:

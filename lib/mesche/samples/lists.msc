@@ -1,0 +1,11 @@
+(define four 4)
+
+;; Using `list` function
+(display (list 1 2 3 four))
+
+;; Quoted lists
+(display '(1 2 3 four))
+
+;; Backquoted lists
+(display `(1 2 3 ,four))
+(display `(1 2 3 ,(+ 3 1)))

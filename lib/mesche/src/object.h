@@ -11,6 +11,9 @@
 #define OBJECT_VAL(value) ((Value){VALUE_OBJECT, {.object = (Object *)value}})
 #define OBJECT_KIND(value) (AS_OBJECT(value)->kind)
 
+#define IS_CONS(value) mesche_object_is_kind(value, ObjectKindCons)
+#define AS_CONS(value) ((ObjectCons *)AS_OBJECT(value))
+
 #define IS_FUNCTION(value) mesche_object_is_kind(value, ObjectKindFunction)
 #define AS_FUNCTION(value) ((ObjectFunction *)AS_OBJECT(value))
 
@@ -33,6 +36,7 @@ typedef enum {
   ObjectKindString,
   ObjectKindSymbol,
   ObjectKindKeyword,
+  ObjectKindCons,
   ObjectKindUpvalue,
   ObjectKindFunction,
   ObjectKindClosure,

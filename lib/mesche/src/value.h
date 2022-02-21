@@ -5,7 +5,9 @@
 // issues between vm.h, value.h, and object.h.
 typedef struct Object Object;
 typedef struct ObjectString ObjectString;
+typedef struct ObjectSymbol ObjectSymbol;
 typedef struct ObjectKeyword ObjectKeyword;
+typedef struct ObjectCons ObjectCons;
 typedef struct ObjectFunction ObjectFunction;
 typedef struct ObjectClosure ObjectClosure;
 typedef struct ObjectUpvalue ObjectUpvalue;
@@ -16,6 +18,7 @@ typedef struct ObjectUpvalue ObjectUpvalue;
 
 #define T_VAL ((Value){VALUE_TRUE, {.number = 0}})
 #define NIL_VAL ((Value){VALUE_NIL, {.number = 0}})
+#define EMPTY_VAL ((Value){VALUE_EMPTY, {.number = 0}})
 #define NUMBER_VAL(value) ((Value){VALUE_NUMBER, {.number = value}})
 #define BOOL_VAL(value) ((Value){value ? VALUE_TRUE : VALUE_NIL, {.number = 0}})
 

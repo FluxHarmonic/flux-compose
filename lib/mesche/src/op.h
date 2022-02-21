@@ -7,6 +7,8 @@ typedef enum {
   OP_T,
   OP_POP,
   OP_POP_SCOPE,
+  OP_CONS,
+  OP_LIST,
   OP_ADD,
   OP_SUBTRACT,
   OP_MULTIPLY,

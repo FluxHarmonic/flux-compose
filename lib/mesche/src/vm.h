@@ -27,6 +27,7 @@ typedef struct {
   Value *stack_top;
   Table strings;
   Table globals;
+  Table symbols;
   ObjectUpvalue *open_upvalues;
   Object *objects;
 

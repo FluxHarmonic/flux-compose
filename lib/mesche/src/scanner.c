@@ -131,10 +131,12 @@ static TokenKind scanner_identifier_type(Scanner *scanner) {
     switch(scanner->start[1]) {
     case 'e': return scanner_check_keyword(scanner, 2, 1, "t", TokenKindLet);
     case 'a': return scanner_check_keyword(scanner, 2, 4, "mbda", TokenKindLambda);
+    case 'i': return scanner_check_keyword(scanner, 2, 2, "st", TokenKindList);
     }
   }
   case 'b': return scanner_check_keyword(scanner, 1, 4, "egin", TokenKindBegin);
   case 'i': return scanner_check_keyword(scanner, 1, 1, "f", TokenKindIf);
+  case 'c': return scanner_check_keyword(scanner, 1, 3, "ons", TokenKindCons);
   }
 
   return TokenKindSymbol;
@@ -200,6 +202,10 @@ Token mesche_scanner_next_token(Scanner *scanner) {
   case '(': return scanner_make_token(scanner, TokenKindLeftParen);
   case ')': return scanner_make_token(scanner, TokenKindRightParen);
   case '"': return scanner_read_string(scanner);
+  case '\'': return scanner_make_token(scanner, TokenKindQuote);
+  case '`': return scanner_make_token(scanner, TokenKindBackquote);
+  case ',': return scanner_make_token(scanner, TokenKindUnquote);
+  case '@': return scanner_make_token(scanner, TokenKindSplice);
   case ':': return scanner_read_identifier(scanner);
   case '+':
     // TODO: Make sure this isn't the start of a symbol

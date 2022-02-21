@@ -211,6 +211,12 @@ static void compiler_parse_keyword(CompilerContext *ctx) {
                                                  ctx->parser->previous.length - 1)));
 }
 
+static void compiler_parse_symbol_literal(CompilerContext *ctx) {
+  compiler_emit_constant(
+      ctx, OBJECT_VAL(mesche_object_make_symbol(ctx->vm, ctx->parser->previous.start,
+                                                ctx->parser->previous.length)));
+}
+
 static void compiler_parse_literal(CompilerContext *ctx) {
   switch (ctx->parser->previous.kind) {
   case TokenKindNil:
@@ -629,7 +635,7 @@ static void compiler_parse_if(CompilerContext *ctx) {
   compiler_consume(ctx, TokenKindRightParen, "Expected right paren to end 'if' expression");
 }
 
-static void compiler_parse_operator_call(CompilerContext *ctx, Token *call_token) {
+static void compiler_parse_operator_call(CompilerContext *ctx, Token *call_token, uint8_t operand_count) {
   TokenKind operator= call_token->kind;
   switch (operator) {
   case TokenKindPlus:
@@ -652,6 +658,12 @@ static void compiler_parse_operator_call(CompilerContext *ctx, Token *call_token
     break;
   case TokenKindNot:
     compiler_emit_byte(ctx, OP_NOT);
+    break;
+  case TokenKindList:
+    compiler_emit_bytes(ctx, OP_LIST, operand_count);
+    break;
+  case TokenKindCons:
+    compiler_emit_byte(ctx, OP_CONS);
     break;
   case TokenKindEqv:
     compiler_emit_byte(ctx, OP_EQV);
@@ -695,6 +707,60 @@ static bool compiler_parse_special_form(CompilerContext *ctx, Token *call_token)
   return true;
 }
 
+static void compiler_parse_quoted_list(CompilerContext *ctx) {
+  bool is_backquote = ctx->parser->previous.kind == TokenKindBackquote;
+
+  // Ensure the open paren is there
+  compiler_consume(ctx, TokenKindLeftParen, "Expected left paren after quote.");
+
+  uint8_t item_count = 0;
+  for (;;) {
+    // Bail out when we hit the closing parentheses
+    if (ctx->parser->current.kind == TokenKindRightParen) {
+      // Emit the list operation
+      compiler_advance(ctx);
+      compiler_emit_bytes(ctx, OP_LIST, item_count);
+      return;
+    }
+
+    // Parse certain token types differently in quoted lists
+    switch (ctx->parser->current.kind) {
+    case TokenKindSymbol:
+      compiler_advance(ctx);
+      compiler_parse_symbol_literal(ctx);
+      break;
+    case TokenKindLeftParen:
+      compiler_parse_quoted_list(ctx);
+      break;
+    case TokenKindUnquote:
+      // Evaluate whatever the next expression is
+      compiler_advance(ctx);
+
+      if (ctx->parser->current.kind == TokenKindSplice) {
+        PANIC("Splicing is not currently supported.\n");
+      }
+
+      if (!is_backquote) {
+        compiler_error(ctx, "Cannot use unquote in a non-backquoted expression.");
+        compiler_parse_quoted_list(ctx);
+      } else {
+        compiler_parse_expr(ctx);
+      }
+      break;
+    case TokenKindPlus:
+    case TokenKindMinus:
+    case TokenKindSlash:
+    case TokenKindStar:
+      compiler_advance(ctx);
+      compiler_parse_symbol_literal(ctx);
+      break;
+    default: compiler_parse_expr(ctx);
+    }
+
+    item_count++;
+  }
+}
+
 static void compiler_parse_list(CompilerContext *ctx) {
   // Try to find the call target (this could be an expression!)
   Token call_token = ctx->parser->current;
@@ -728,7 +794,7 @@ static void compiler_parse_list(CompilerContext *ctx) {
     if (ctx->parser->current.kind == TokenKindRightParen) {
       if (is_call == false) {
         // Compile the primitive operator
-        compiler_parse_operator_call(ctx, &call_token);
+        compiler_parse_operator_call(ctx, &call_token, arg_count);
       } else {
         // Emit the call operation
         compiler_emit_bytes(ctx, OP_CALL, arg_count);
@@ -785,6 +851,12 @@ static void compiler_parse_expr(CompilerContext *ctx) {
   }
 
   // Is it a list that starts with a quote?
+  if (ctx->parser->current.kind == TokenKindQuote ||
+      ctx->parser->current.kind == TokenKindBackquote) {
+    compiler_advance(ctx);
+    compiler_parse_quoted_list(ctx);
+    return;
+  }
 
   // Must be an atom
   if (ctx->parser->current.kind == TokenKindNumber) {
@@ -799,9 +871,14 @@ static void compiler_parse_expr(CompilerContext *ctx) {
   } else if (ctx->parser->current.kind == TokenKindString) {
     compiler_advance(ctx);
     compiler_parse_string(ctx);
+  } else if (ctx->parser->current.kind == TokenKindKeyword) {
+    compiler_advance(ctx);
+    compiler_parse_keyword(ctx);
   } else if (ctx->parser->current.kind == TokenKindSymbol) {
     compiler_advance(ctx);
     compiler_parse_identifier(ctx);
+  } else {
+    PANIC("Unexpected token kind: %d\n", ctx->parser->current.kind);
   }
 }
 

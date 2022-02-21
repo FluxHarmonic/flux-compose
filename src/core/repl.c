@@ -20,9 +20,14 @@ void flux_repl_start(FILE *fp) {
 
     /* flux_log("EXPR: %s\n", input_buffer); */
 
-    // TODO: Print the value for true REPL
+    // Evaluate the string
     mesche_vm_eval_string(&vm, input_buffer);
     input_buffer[0] = '\0';
+
+    // Print the last remaining value on the stack
+    Value result = mesche_vm_stack_pop(&vm);
+    mesche_value_print(result);
+    printf("\n");
   }
 }
 

@@ -50,7 +50,7 @@ ObjectString *mesche_object_make_string(VM *vm, const char *chars, int length) {
   // Allocate and initialize the string object
   ObjectString *string = ALLOC_OBJECT_EX(vm, ObjectString, length + 1, ObjectKindString);
   memcpy(string->chars, chars, length);
-  string->chars[length] = '\0';
+  string->chars[length + 1] = '\0';
   string->length = length;
   string->hash = hash;
 
@@ -66,6 +66,33 @@ ObjectString *mesche_object_make_string(VM *vm, const char *chars, int length) {
   return string;
 }
 
+ObjectSymbol *mesche_object_make_symbol(VM *vm, const char *chars, int length) {
+  // Is the string already interned?
+  uint32_t hash = object_string_hash(chars, length);
+  ObjectSymbol *interned_symbol = (ObjectSymbol*)mesche_table_find_key(&vm->symbols, chars, length, hash);
+  if (interned_symbol != NULL)
+    return interned_symbol;
+
+  // Allocate and initialize the string object
+  ObjectSymbol *symbol = ALLOC_OBJECT_EX(vm, ObjectSymbol, length + 1, ObjectKindSymbol);
+  memcpy(symbol->string.chars, chars, length);
+  symbol->string.chars[length + 1] = '\0';
+  symbol->string.length = length;
+  symbol->string.hash = hash;
+
+  // Push the string onto the stack temporarily to avoid GC
+  mesche_vm_stack_push(vm, OBJECT_VAL(symbol));
+
+  // Add the symbol's string to the interned set.  This will allow us
+  // to pull it back out as a symbol later
+  mesche_table_set((MescheMemory *)vm, &vm->symbols, &symbol->string, NIL_VAL);
+
+  // Pop the string back off the stack
+  mesche_vm_stack_pop(vm);
+
+  return symbol;
+}
+
 ObjectKeyword *mesche_object_make_keyword(VM *vm, const char *chars, int length) {
   // TODO: Do we want to intern keyword strings too?
   // Allocate and initialize the string object
@@ -79,24 +106,11 @@ ObjectKeyword *mesche_object_make_keyword(VM *vm, const char *chars, int length)
   return (ObjectKeyword *)keyword;
 }
 
-ObjectString *mesche_object_make_symbol(VM *vm, const char *chars, int length) {
-  // Is the string already interned?
-  uint32_t hash = object_string_hash(chars, length);
-  ObjectString *interned_string = mesche_table_find_key(&vm->strings, chars, length, hash);
-  if (interned_string != NULL)
-    return interned_string;
-
-  // Allocate and initialize the string object
-  ObjectString *string = ALLOC_OBJECT_EX(vm, ObjectString, length + 1, ObjectKindString);
-  memcpy(string->chars, chars, length);
-  string->chars[length] = '\0';
-  string->length = length;
-  string->hash = hash;
-
-  // Add the string to the interned set
-  mesche_table_set((MescheMemory *)vm, &vm->strings, string, NIL_VAL);
-
-  return string;
+ObjectCons *mesche_object_make_cons(VM *vm, Value car, Value cdr) {
+  ObjectCons *cons = ALLOC_OBJECT(vm, ObjectCons, ObjectKindCons);
+  cons->car = car;
+  cons->cdr = cdr;
+  return cons;
 }
 
 ObjectUpvalue *mesche_object_make_upvalue(VM *vm, Value *slot) {
@@ -183,11 +197,19 @@ void mesche_object_free(VM *vm, Object *object) {
     FREE_SIZE(vm, string, (sizeof(ObjectString) + string->length + 1));
     break;
   }
+  case ObjectKindSymbol: {
+    ObjectSymbol *symbol= (ObjectSymbol *)object;
+    FREE_SIZE(vm, symbol, (sizeof(ObjectSymbol) + symbol->string.length + 1));
+    break;
+  }
   case ObjectKindKeyword: {
     ObjectKeyword *keyword = (ObjectKeyword *)object;
     FREE_SIZE(vm, keyword, (sizeof(ObjectKeyword) + keyword->string.length + 1));
     break;
   }
+  case ObjectKindCons:
+    FREE(vm, ObjectCons, object);
+    break;
   case ObjectKindUpvalue:
     FREE(vm, ObjectUpvalue, object);
     break;
@@ -237,9 +259,34 @@ void mesche_object_print(Value value) {
   case ObjectKindString:
     printf("%s", AS_CSTRING(value));
     break;
+  case ObjectKindSymbol:
+    printf("%s", AS_CSTRING(value));
+    break;
   case ObjectKindKeyword:
     printf(":%s", AS_CSTRING(value));
     break;
+  case ObjectKindCons: {
+    ObjectCons *cons = AS_CONS(value);
+    printf("(");
+
+    for(;;) {
+      mesche_value_print(cons->car);
+      if (IS_EMPTY(cons->cdr)) {
+        break;
+      } else if(IS_CONS(cons->cdr)) {
+        cons = AS_CONS(cons->cdr);
+      } else {
+        printf(" . ");
+        mesche_value_print(cons->cdr);
+        break;
+      }
+
+      printf(" ");
+    }
+
+    printf(")");
+    break;
+  }
   case ObjectKindUpvalue:
     printf("upvalue");
     break;

@@ -32,6 +32,7 @@ void mesche_value_print(Value value) {
   case VALUE_NUMBER: printf("%g", AS_NUMBER(value)); break;
   case VALUE_NIL: printf("nil"); break;
   case VALUE_TRUE: printf("t"); break;
+  case VALUE_EMPTY: printf("()"); break;
   case VALUE_OBJECT: mesche_object_print(value); break;
   }
 }
