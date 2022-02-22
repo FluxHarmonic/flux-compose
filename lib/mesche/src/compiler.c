@@ -223,9 +223,9 @@ static void compiler_parse_keyword(CompilerContext *ctx) {
 }
 
 static void compiler_parse_symbol_literal(CompilerContext *ctx) {
-  compiler_emit_constant(
-      ctx, OBJECT_VAL(mesche_object_make_symbol(ctx->vm, ctx->parser->previous.start,
-                                                ctx->parser->previous.length)));
+  compiler_emit_constant(ctx,
+                         OBJECT_VAL(mesche_object_make_symbol(ctx->vm, ctx->parser->previous.start,
+                                                              ctx->parser->previous.length)));
 }
 
 static void compiler_parse_literal(CompilerContext *ctx) {
@@ -403,7 +403,8 @@ static void compiler_parse_identifier(CompilerContext *ctx) {
   }
 }
 
-static void compiler_define_variable_ex(CompilerContext *ctx, uint8_t variable_constant, DefineAttributes *define_attributes) {
+static void compiler_define_variable_ex(CompilerContext *ctx, uint8_t variable_constant,
+                                        DefineAttributes *define_attributes) {
   // We don't define global variables in local scopes
   if (ctx->scope_depth > 0) {
     // TODO: Is this necessary?
@@ -493,7 +494,8 @@ static void compiler_parse_let(CompilerContext *ctx) {
   compiler_end_scope(ctx);
 }
 
-static void compiler_parse_define_attributes(CompilerContext *ctx, DefineAttributes *define_attributes) {
+static void compiler_parse_define_attributes(CompilerContext *ctx,
+                                             DefineAttributes *define_attributes) {
   for (;;) {
     if (ctx->parser->current.kind == TokenKindKeyword) {
       compiler_advance(ctx);
@@ -685,7 +687,8 @@ static void compiler_parse_define_module(CompilerContext *ctx) {
     }
   }
 
-  compiler_consume(ctx, TokenKindRightParen, "Expected right paren to complete 'define-module' expression.");
+  compiler_consume(ctx, TokenKindRightParen,
+                   "Expected right paren to complete 'define-module' expression.");
 }
 
 static int compiler_emit_jump(CompilerContext *ctx, uint8_t instruction) {
@@ -739,7 +742,8 @@ static void compiler_parse_if(CompilerContext *ctx) {
   compiler_consume(ctx, TokenKindRightParen, "Expected right paren to end 'if' expression");
 }
 
-static void compiler_parse_operator_call(CompilerContext *ctx, Token *call_token, uint8_t operand_count) {
+static void compiler_parse_operator_call(CompilerContext *ctx, Token *call_token,
+                                         uint8_t operand_count) {
   TokenKind operator= call_token->kind;
   switch (operator) {
   case TokenKindPlus:
@@ -798,7 +802,7 @@ static void compiler_parse_module_enter(CompilerContext *ctx) {
 }
 
 static bool compiler_parse_special_form(CompilerContext *ctx, Token *call_token) {
-  TokenKind operator = call_token->kind;
+  TokenKind operator= call_token->kind;
   switch (operator) {
   case TokenKindBegin:
     compiler_parse_block(ctx, true);
@@ -836,6 +840,13 @@ static bool compiler_parse_special_form(CompilerContext *ctx, Token *call_token)
 
 static void compiler_parse_quoted_list(CompilerContext *ctx) {
   bool is_backquote = ctx->parser->previous.kind == TokenKindBackquote;
+
+  // If this is a quoted symbol, just parse it and return
+  if (ctx->parser->current.kind == TokenKindSymbol) {
+    compiler_advance(ctx);
+    compiler_parse_symbol_literal(ctx);
+    return;
+  }
 
   // Ensure the open paren is there
   compiler_consume(ctx, TokenKindLeftParen, "Expected left paren after quote.");
@@ -881,7 +892,8 @@ static void compiler_parse_quoted_list(CompilerContext *ctx) {
       compiler_advance(ctx);
       compiler_parse_symbol_literal(ctx);
       break;
-    default: compiler_parse_expr(ctx);
+    default:
+      compiler_parse_expr(ctx);
     }
 
     item_count++;

@@ -18,7 +18,7 @@ add_library(mesche)
 target_link_libraries(mesche)
 
 add_library(flux)
-target_link_libraries(flux m z ${FREETYPE_LIBRARIES} ${Fontconfig_LIBRARIES} Threads::Threads glfw OpenGL::GL ${CMAKE_DL_LIBS})
+target_link_libraries(flux mesche m z ${FREETYPE_LIBRARIES} ${Fontconfig_LIBRARIES} Threads::Threads glfw OpenGL::GL ${CMAKE_DL_LIBS})
 target_include_directories(flux PRIVATE ${FREETYPE_INCLUDE_DIRS} ${FONTCONFIG_INCLUDE_DIRS})
 
 add_executable(flux-compose)

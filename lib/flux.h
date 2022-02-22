@@ -2,6 +2,7 @@
 #define __FLUX_H
 
 #define GLFW_INCLUDE_NONE
+#include <cglm/cglm.h>
 #include <glad/glad.h>
 #include <inttypes.h>
 #include <mesche.h>
@@ -108,6 +109,7 @@ extern GLuint flux_graphics_shader_compile(const FluxShaderFile *shader_files,
 Value flux_graphics_func_show_preview_window(MescheMemory *mem, int arg_count, Value *args);
 Value flux_graphics_func_render_to_file(MescheMemory *mem, int arg_count, Value *args);
 Value flux_graphics_func_flux_harmonic_thumbnail(MescheMemory *mem, int arg_count, Value *args);
+Value flux_graphics_func_graphics_scene_set(MescheMemory *mem, int arg_count, Value *args);
 
 // Shaders ---------------------------------------
 
@@ -129,37 +131,51 @@ Value flux_graphics_func_load_font_internal(MescheMemory *mem, int arg_count, Va
 // Scene ------------------------------------------
 
 // Member types
-#define TYPE_CIRCLE 2
+typedef enum { TYPE_CIRCLE, TYPE_IMAGE } SceneMemberKind;
 
-typedef struct ColorType {
+typedef struct {
   uint8_t r;
   uint8_t g;
   uint8_t b;
   uint8_t a;
 } Color;
 
-typedef struct CircleType {
+typedef struct {
   int16_t x;
   int16_t y;
   int16_t radius;
   Color *color;
 } Circle;
 
-typedef struct SceneMemberType {
-  uint32_t type;
-  void *props;
+typedef struct {
+  SceneMemberKind kind;
 } SceneMember;
 
-typedef struct SceneType {
+typedef struct {
+  SceneMember member;
+  FluxTexture texture;
+  vec2 position;
+} SceneImage;
+
+typedef struct {
+  double width;
+  double height;
   uint32_t member_count;
-  SceneMember *members;
+  SceneMember **members;
 } Scene;
 
-extern uint32_t register_set_scene_event(void);
-extern void init_staging_scene(void);
-extern void promote_staging_scene(void);
-extern void flip_current_scene(Scene **);
-/* extern void render_scene(SDL_Renderer *, Scene *); */
+SceneImage *flux_scene_make_image(FluxTexture *texture, double x, double y);
+Scene *flux_scene_make_scene(double width, double height);
+void flux_scene_render(FluxRenderContext context, Scene *scene);
+
+// Mesche API wrappers
+Value flux_scene_func_scene_image_make(MescheMemory *mem, int arg_count, Value *args);
+Value flux_scene_func_scene_make(MescheMemory *mem, int arg_count, Value *args);
+
+uint32_t register_set_scene_event(void);
+void init_staging_scene(void);
+void promote_staging_scene(void);
+void flip_current_scene(Scene **);
 
 // Scripting ----------------------------------------
 

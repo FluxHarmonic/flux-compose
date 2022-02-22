@@ -1,15 +1,28 @@
-(define width 2500)
-(define height 1406)
+(define-module (flux graphics))
 
-(define (font-load :keys family weight size)
+;; Store the current scene so that it doesn't get garbage collected
+(define current-scene nil)
+
+(define (font-load :keys family weight size) :export
   (font-load-internal family weight size))
 
-(define (image-load path)
+(define (image-load path) :export
   (image-load-internal path))
 
-(define (scene :keys width height)
-  (display "Defining a scene!")
-  t)
+(define (image :keys name texture x y scale) :export
+  (scene-image-make texture x y scale))
+
+(define (scene :keys width height members) :export
+  (scene-make width height members))
+
+(define (scene-render scene) :export
+  (graphics-scene-set! scene))
+
+(define-module (flux thumbnail)
+  (import (flux graphics)))
+
+(define width 2500)
+(define height 1406)
 
 (show-preview-window width height)
 
@@ -18,9 +31,16 @@
 (define bg-image (image-load "/home/daviwil/Notes/Shows/FluxHarmonic/Media/Flux-Harmonic-BG-Base.png"))
 (define logo-image (image-load "/home/daviwil/Notes/Shows/FluxHarmonic/Media/Flux Harmonic.png"))
 
-(define flux-thumbnail
-  (scene :width width
-         :height height))
+(scene-render
+ (scene :width width
+        :height height
+        :members (list (image :name 'bg
+                              :texture bg-image
+                              :x 0 :y 0)
+                       (image :name 'logo
+                              :texture logo-image
+                              :x (- (/ width 2) 500)
+                              :y (/ height 5)))))
 
 ;; (flux-harmonic-thumbnail "February 17, 2022")
 ;; (render-to-file "thumbnail.png")

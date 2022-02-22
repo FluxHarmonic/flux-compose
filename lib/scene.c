@@ -61,45 +61,6 @@ ValueHeader *flux_graphics_func_circle(VectorCursor *list_cursor, ValueCursor *v
   return NULL;
 }
 
-void add_scene_member(uint32_t type, void *props) {
-  // Add the member in the member array
-  // TODO: Check if we've reached the size limit!
-  if (staging_scene != NULL) {
-    SceneMember *new_member = &staging_scene->members[staging_scene->member_count++];
-    new_member->type = type;
-    new_member->props = props;
-
-    flux_log("Added scene member: %d\n", type);
-  } else {
-    // TODO PANIC
-    flux_log("Attempting to add member to uninitialized scene!\n");
-  }
-}
-
-void init_staging_scene(void) {
-  Scene *new_scene = malloc(sizeof(Scene));
-  new_scene->member_count = 0;
-  new_scene->members = malloc(sizeof(SceneMember) * INITIAL_MEMBER_SIZE);
-  staging_scene = new_scene;
-
-  flux_log("New scene initialized!\n");
-}
-
-void promote_staging_scene(void) {
-  /* SDL_Event event; */
-  /* SDL_memset(&event, 0, sizeof(event)); */
-  /* event.type = scene_event_id; */
-  /* SDL_PushEvent(&event); */
-
-  flux_log("Promote staging scene!\n");
-}
-
-void flip_current_scene(Scene **current_scene_ptr) {
-  flux_log("Flipping the staging scene!\n");
-  *current_scene_ptr = staging_scene;
-  init_staging_scene();
-}
-
 /* void render_filled_circle(SDL_Renderer *renderer, Circle *circle) { */
 /*   // Draw a circle */
 /*   Color *color = circle->color; */
@@ -108,13 +69,89 @@ void flip_current_scene(Scene **current_scene_ptr) {
 /*                    color->a); */
 /* } */
 
-/* void render_scene(SDL_Renderer *renderer, Scene *scene) { */
-/*   // Draw the scene */
-/*   for (int i = 0; i < scene->member_count; i++) { */
-/*     switch (scene->members[i].type) { */
-/*     case TYPE_CIRCLE: */
-/*       render_filled_circle(renderer, scene->members[i].props); */
-/*       break; */
-/*     } */
-/*   } */
-/* } */
+static void scene_render_image(FluxRenderContext context, Scene *scene, SceneImage *image) {
+  FluxDrawArgs draw_args;
+  draw_args.shader_program = 0;
+
+  flux_graphics_draw_args_scale(&draw_args, 1.5f, 1.5f);
+  flux_graphics_draw_args_center(&draw_args, false);
+  flux_graphics_draw_texture_ex(context, image->texture, image->position[0], image->position[1],
+                                &draw_args);
+}
+
+void flux_scene_render(FluxRenderContext context, Scene *scene) {
+  // Draw the scene
+  for (int i = 0; i < scene->member_count; i++) {
+    switch (scene->members[i]->kind) {
+    /* case TYPE_CIRCLE: */
+    /*   render_filled_circle(renderer, scene->members[i].props); */
+    /*   break; */
+    case TYPE_IMAGE:
+      scene_render_image(context, scene, (SceneImage *)scene->members[i]);
+      break;
+    }
+  }
+}
+
+SceneImage *flux_scene_make_image(FluxTexture *texture, double x, double y) {
+  SceneImage *image = flux_memory_alloc(sizeof(SceneImage));
+  image->member.kind = TYPE_IMAGE;
+  image->texture = texture;
+  image->position[0] = x;
+  image->position[1] = y;
+
+  return image;
+}
+
+Value flux_scene_func_scene_image_make(MescheMemory *mem, int arg_count, Value *args) {
+  if (arg_count != 4) {
+    flux_log("Function requires 4 parameters.");
+  }
+
+  ObjectPointer *texture_ptr = AS_POINTER(args[0]);
+  FluxTexture *texture = texture_ptr->ptr;
+  double pos_x = AS_NUMBER(args[1]);
+  double pos_y = AS_NUMBER(args[2]);
+
+  SceneImage *image = flux_scene_make_image(texture, pos_x, pos_y);
+  return OBJECT_VAL(mesche_object_make_pointer((VM *)mem, image, true));
+}
+
+Scene *flux_scene_make_scene(double width, double height) {
+  Scene *scene = malloc(sizeof(Scene));
+  scene->width = width;
+  scene->height = height;
+  scene->member_count = 0;
+  scene->members = malloc(sizeof(SceneMember *) * INITIAL_MEMBER_SIZE);
+
+  return scene;
+}
+
+void flux_scene_member_add(Scene *scene, SceneMember *member) {
+  scene->members[scene->member_count] = member;
+  scene->member_count++;
+}
+
+Value flux_scene_func_scene_make(MescheMemory *mem, int arg_count, Value *args) {
+  if (arg_count != 3) {
+    flux_log("Function requires 3 parameters.");
+  }
+
+  double width = AS_NUMBER(args[0]);
+  double height = AS_NUMBER(args[1]);
+  Value *members = &args[2];
+
+  // Create the new scene
+  Scene *scene = flux_scene_make_scene(width, height);
+
+  // Add the member pointers to the scene
+  Value *current_member = members;
+  while (IS_CONS(*current_member)) {
+    ObjectCons *cons = AS_CONS(*current_member);
+    ObjectPointer *member_ptr = AS_POINTER(cons->car);
+    flux_scene_member_add(scene, (SceneMember *)member_ptr->ptr);
+    current_member = &cons->cdr;
+  }
+
+  return OBJECT_VAL(mesche_object_make_pointer((VM *)mem, scene, true));
+}

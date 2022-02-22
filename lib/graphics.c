@@ -14,6 +14,10 @@
 static char output_image_path[1024];
 static char flux_thumbnail_str[100];
 
+// When set to a value, this scene will be used in the next frame
+// TODO: Don't depend on a global!
+static Scene *next_scene = NULL;
+
 // model: affecting the shape and translation of the object
 // view: affecting the position of the camera, possibly scale (make camera lens bigger/smaller)
 // projection: projecting to screen coordinates
@@ -543,6 +547,7 @@ void flux_graphics_render_thumbnail(FluxRenderContext context) {
 
 void *flux_graphics_render_loop(void *arg) {
   float amt, scale;
+  Scene *current_scene = NULL;
   FluxWindow window = arg;
   FluxRenderContext context = &window->context;
   GLFWwindow *glfwWindow = window->glfwWindow;
@@ -587,6 +592,8 @@ void *flux_graphics_render_loop(void *arg) {
     // Poll for events for this frame
     glfwPollEvents();
 
+    // TODO: Read from the REPL asynchronously
+
     // Clear the screen
     glClearColor(0.0, 0.0, 0.0, 1.0);
     glClear(GL_COLOR_BUFFER_BIT);
@@ -603,11 +610,16 @@ void *flux_graphics_render_loop(void *arg) {
     /* flux_graphics_draw_rect_fill(context, -1.f, -1.f, 1280 + 1.f, 720 + 1.f, (vec4) { 1.0, 1.0,
      * 0.0, 1.0 }); */
 
-    // Render the test scene
-    if (flux_thumbnail_str[0] != '\0') {
-      flux_graphics_render_thumbnail(context);
-    } else {
-      flux_graphics_render_test(context);
+    // Should we switch to a new scene?
+    if (next_scene) {
+      printf("Switching to next scene...\n");
+      current_scene = next_scene;
+      next_scene = NULL;
+    }
+
+    // Render the scene
+    if (current_scene) {
+      flux_scene_render(context, current_scene);
     }
 
     // Render the screen to a file once
@@ -715,4 +727,15 @@ Value flux_graphics_func_flux_harmonic_thumbnail(MescheMemory *mem, int arg_coun
   char *date_str = AS_CSTRING(args[0]);
   flux_log("Received request to render thumbnail: %s\n", date_str);
   memcpy(flux_thumbnail_str, date_str, strlen(date_str));
+}
+
+Value flux_graphics_func_graphics_scene_set(MescheMemory *mem, int arg_count, Value *args) {
+  if (arg_count != 1) {
+    flux_log("Function requires a scene to set.");
+  }
+
+  ObjectPointer *scene_ptr = AS_POINTER(args[0]);
+
+  printf("SETTING THE NEXT SCENE!\n");
+  next_scene = (Scene *)scene_ptr->ptr;
 }
