@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <time.h>
 
+#include "vm.h"
 #include "chunk.h"
 #include "compiler.h"
 #include "disasm.h"
@@ -11,7 +12,7 @@
 #include "op.h"
 #include "util.h"
 #include "value.h"
-#include "vm.h"
+#include "module.h"
 
 // NOTE: Enable this for diagnostic purposes
 /* #define DEBUG_TRACE_EXECUTION */
@@ -105,12 +106,23 @@ static void mem_mark_value(VM *vm, Value value) {
     mesche_mem_mark_object(vm, AS_OBJECT(value));
 }
 
+static void mem_mark_array(VM *vm, ValueArray *array) {
+  for (int i = 0; i < array->count; i++) {
+    mem_mark_value(vm, array->values[i]);
+  }
+}
+
 static void mem_mark_table(VM *vm, Table *table) {
   for (int i = 0; i < table->capacity; i++) {
     Entry *entry = &table->entries[i];
     mesche_mem_mark_object(vm, (Object *)entry->key);
     mem_mark_value(vm, entry->value);
   }
+}
+
+static void mem_mark_module(VM *vm, struct ObjectModule *module) {
+  mem_mark_table(vm, &module->locals);
+  mem_mark_array(vm, &module->exports);
 }
 
 static void mem_mark_roots(void *target) {
@@ -127,13 +139,8 @@ static void mem_mark_roots(void *target) {
     mesche_mem_mark_object(vm, (Object *)upvalue);
   }
 
-  mem_mark_table(vm, &vm->globals);
-}
-
-static void mem_mark_array(VM *vm, ValueArray *array) {
-  for (int i = 0; i < array->count; i++) {
-    mem_mark_value(vm, array->values[i]);
-  }
+  // Mark roots in every module
+  mem_mark_table(vm, &vm->modules);
 }
 
 static void mem_darken_object(VM *vm, Object *object) {
@@ -166,6 +173,8 @@ static void mem_darken_object(VM *vm, Object *object) {
   case ObjectKindUpvalue:
     mem_mark_value(vm, ((ObjectUpvalue *)object)->closed);
     break;
+  case ObjectKindModule:
+    mem_mark_module(vm, ((ObjectModule *)object));
   default:
     break;
   }
@@ -226,7 +235,7 @@ static void mem_collect_garbage(MescheMemory *mem) {
   if (vm->current_compiler != NULL) {
     mesche_compiler_mark_roots(vm->current_compiler);
   }
-  mem_trace_references(vm);
+  mem_trace_references((MescheMemory *)vm);
   mem_table_remove_white(&vm->strings);
   mem_table_remove_white(&vm->symbols);
   mem_sweep_objects(vm);
@@ -242,7 +251,14 @@ void mesche_vm_init(VM *vm) {
   mesche_table_init(&vm->strings);
   mesche_table_init(&vm->symbols);
 
-  // Initialize the grya stack
+  // Initialize the module table root module
+  mesche_table_init(&vm->modules);
+  ObjectString *module_name = mesche_object_make_string(vm, "mesche-user", 11);
+  vm->root_module = mesche_object_make_module(vm, module_name);
+  vm->current_module = vm->root_module;
+  mesche_table_set((MescheMemory*)vm, &vm->modules, vm->root_module->name, OBJECT_VAL(vm->root_module));
+
+  // Initialize the gray stack
   vm->gray_count = 0;
   vm->gray_capacity = 0;
   vm->gray_stack = NULL;
@@ -295,7 +311,7 @@ static bool vm_call(VM *vm, ObjectClosure *closure, uint8_t arg_count) {
       // Check if the passed keyword args match this keyword
       bool found_match = false;
       for (int j = 0; j < arg_count - start_index; j += 2) {
-        if (mesche_object_string_equalsp(keyword_arg->name,
+        if (mesche_object_string_equalsp((Object *)keyword_arg->name,
                                          (Object *)AS_KEYWORD(stored_keyword_args[j]))) {
           // Put the value on the stack
           mesche_vm_stack_push(vm, stored_keyword_args[j + 1]);
@@ -564,13 +580,37 @@ InterpretResult mesche_vm_run(VM *vm) {
       // Peek at the value on the stack
       mesche_value_print(vm_stack_peek(vm, 0));
       break;
+    case OP_DEFINE_MODULE: {
+      ObjectCons *list = AS_CONS(mesche_vm_stack_pop(vm));
+      mesche_module_enter_path(vm, list);
+      mesche_vm_stack_push(vm, OBJECT_VAL(vm->current_module));
+      break;
+    }
+    case OP_IMPORT_MODULE: {
+      ObjectCons *list = AS_CONS(mesche_vm_stack_pop(vm));
+      mesche_module_import_path(vm, list);
+      mesche_vm_stack_push(vm, OBJECT_VAL(vm->current_module));
+      break;
+    }
+    case OP_ENTER_MODULE: {
+      ObjectCons *list = AS_CONS(mesche_vm_stack_pop(vm));
+      mesche_module_enter_path(vm, list);
+      mesche_vm_stack_push(vm, OBJECT_VAL(vm->current_module));
+      break;
+    }
+    case OP_EXPORT_SYMBOL:
+      name = READ_STRING();
+      // TODO: Convert the local value for this binding to an ObjectExport
+      mesche_value_array_write((MescheMemory *)vm, &vm->current_module->exports, OBJECT_VAL(name));
+      break;
     case OP_DEFINE_GLOBAL:
       name = READ_STRING();
-      mesche_table_set((MescheMemory *)vm, &vm->globals, name, vm_stack_peek(vm, 0));
+      mesche_table_set((MescheMemory *)vm, &vm->current_module->locals, name, vm_stack_peek(vm, 0));
       break;
     case OP_READ_GLOBAL:
       name = READ_STRING();
-      if (!mesche_table_get(&vm->globals, name, &value)) {
+      Table *globals = frame->closure->module ? &frame->closure->module->locals : &vm->current_module->locals;
+      if (!mesche_table_get(globals, name, &value)) {
         vm_runtime_error(vm, "Undefined variable '%s'.", name->chars);
         return INTERPRET_RUNTIME_ERROR;
       }
@@ -587,13 +627,15 @@ InterpretResult mesche_vm_run(VM *vm) {
       slot = READ_BYTE();
       mesche_vm_stack_push(vm, frame->slots[slot]);
       break;
-    case OP_SET_GLOBAL:
+    case OP_SET_GLOBAL: {
       name = READ_STRING();
-      if (mesche_table_set((MescheMemory *)vm, &vm->globals, name, vm_stack_peek(vm, 0))) {
+      Table *globals = frame->closure->module ? &frame->closure->module->locals : &vm->current_module->locals;
+      if (mesche_table_set((MescheMemory *)vm, globals, name, vm_stack_peek(vm, 0))) {
         vm_runtime_error(vm, "Undefined variable '%s'.", name->chars);
         return INTERPRET_RUNTIME_ERROR;
       }
       break;
+    }
     case OP_SET_UPVALUE:
       slot = READ_BYTE();
       *frame->closure->upvalues[slot]->location = vm_stack_peek(vm, 0);
@@ -614,7 +656,7 @@ InterpretResult mesche_vm_run(VM *vm) {
       break;
     case OP_CLOSURE: {
       ObjectFunction *function = AS_FUNCTION(READ_CONSTANT());
-      ObjectClosure *closure = mesche_object_make_closure(vm, function);
+      ObjectClosure *closure = mesche_object_make_closure(vm, function, vm->current_module);
       mesche_vm_stack_push(vm, OBJECT_VAL(closure));
 
       for (int i = 0; i < closure->upvalue_count; i++) {
@@ -669,14 +711,20 @@ static Value mesche_vm_clock_native(int arg_count, Value *args) {
   return NUMBER_VAL((double)clock() / CLOCKS_PER_SEC);
 }
 
-void mesche_vm_define_native(VM *vm, const char *name, FunctionPtr function) {
+void mesche_vm_define_native(VM *vm, const char *name, FunctionPtr function, bool exported) {
   // Create objects for the name and the function
-  mesche_vm_stack_push(vm, OBJECT_VAL(mesche_object_make_string(vm, name, (int)strlen(name))));
+  ObjectString *func_name = mesche_object_make_string(vm, name, (int)strlen(name));
+  mesche_vm_stack_push(vm, OBJECT_VAL(func_name));
   mesche_vm_stack_push(vm, OBJECT_VAL(mesche_object_make_native_function(vm, function)));
 
-  // Add the item to the table and pop them back out
-  mesche_table_set((MescheMemory *)vm, &vm->globals, AS_STRING(*(vm->stack_top - 2)),
+  // Add the item to the table and possibly the export list
+  mesche_table_set((MescheMemory *)vm, &vm->current_module->locals, AS_STRING(*(vm->stack_top - 2)),
                    *(vm->stack_top - 1));
+  if (exported) {
+    mesche_value_array_write((MescheMemory *)vm, &vm->current_module->exports, OBJECT_VAL(func_name));
+  }
+
+  // Pop the values we stored temporarily
   mesche_vm_stack_pop(vm);
   mesche_vm_stack_pop(vm);
 }
@@ -689,15 +737,12 @@ InterpretResult mesche_vm_eval_string(VM *vm, const char *script_string) {
 
   // Push the top-level function as a closure
   mesche_vm_stack_push(vm, OBJECT_VAL(function));
-  ObjectClosure *closure = mesche_object_make_closure(vm, function);
+  ObjectClosure *closure = mesche_object_make_closure(vm, function, NULL);
   mesche_vm_stack_pop(vm);
   mesche_vm_stack_push(vm, OBJECT_VAL(closure));
 
   // Call the initial closure
   vm_call(vm, closure, 0);
-
-  // Define core native functions
-  mesche_vm_define_native(vm, "clock", mesche_vm_clock_native);
 
   // Run the VM starting at the first call frame
   return mesche_vm_run(vm);

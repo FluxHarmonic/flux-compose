@@ -121,7 +121,30 @@ static TokenKind scanner_identifier_type(Scanner *scanner) {
   case 'o': return scanner_check_keyword(scanner, 1, 1, "r", TokenKindOr);
   case 'd': {
     switch(scanner->start[1]) {
-    case 'e': return scanner_check_keyword(scanner, 2, 4, "fine", TokenKindDefine);
+    case 'e': {
+      switch(scanner->start[2]) {
+      case 'f': {
+        switch(scanner->start[3]) {
+        case 'i': {
+          switch(scanner->start[4]) {
+          case 'n': {
+            switch(scanner->start[5]) {
+            case 'e': {
+              if (scanner->start[6] == '-') {
+                return scanner_check_keyword(scanner, 6, 7, "-module", TokenKindDefineModule);
+              } else {
+                return scanner_check_keyword(scanner, 6, 0, "", TokenKindDefine);
+              }
+            }
+            }
+          }
+          }
+        }
+        }
+      }
+      }
+      return scanner_check_keyword(scanner, 2, 4, "fine", TokenKindDefine);
+    }
     case 'i': return scanner_check_keyword(scanner, 2, 5, "splay", TokenKindDisplay);
     }
     break;
@@ -135,8 +158,43 @@ static TokenKind scanner_identifier_type(Scanner *scanner) {
     }
   }
   case 'b': return scanner_check_keyword(scanner, 1, 4, "egin", TokenKindBegin);
-  case 'i': return scanner_check_keyword(scanner, 1, 1, "f", TokenKindIf);
+  case 'i': {
+    switch(scanner->start[1]) {
+    case 'm': return scanner_check_keyword(scanner, 2, 4, "port", TokenKindImport);
+    case 'f': return scanner_check_keyword(scanner, 2, 0, "", TokenKindIf);
+    }
+  }
   case 'c': return scanner_check_keyword(scanner, 1, 3, "ons", TokenKindCons);
+  case 'm': {
+    switch(scanner->start[1]) {
+    case 'o': {
+      switch(scanner->start[2]) {
+      case 'd': {
+        switch(scanner->start[3]) {
+        case 'u': {
+          switch(scanner->start[4]) {
+          case 'l': {
+            switch(scanner->start[5]) {
+            case 'e': {
+              switch(scanner->start[6]) {
+              case '-': {
+                switch(scanner->start[7]) {
+                case 'i': return scanner_check_keyword(scanner, 7, 6, "import", TokenKindModuleImport);
+                case 'e': return scanner_check_keyword(scanner, 7, 5, "enter", TokenKindModuleEnter);
+                }
+                }
+              }
+              }
+            }
+            }
+          }
+          }
+        }
+        }
+      }
+      }
+    }
+  }
   }
 
   return TokenKindSymbol;

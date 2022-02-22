@@ -26,8 +26,12 @@ typedef struct {
   Value stack[STACK_MAX]; // TODO: Make this dynamically resizable
   Value *stack_top;
   Table strings;
-  Table globals;
   Table symbols;
+
+  Table modules;
+  ObjectModule *root_module;
+  ObjectModule *current_module;
+
   ObjectUpvalue *open_upvalues;
   Object *objects;
 
@@ -53,7 +57,7 @@ InterpretResult mesche_vm_run(VM *vm);
 InterpretResult mesche_vm_eval_string(VM *vm, const char *script_string);
 void mesche_vm_stack_push(VM *vm, Value value);
 Value mesche_vm_stack_pop(VM *vm);
-void mesche_vm_define_native(VM *vm, const char *name, FunctionPtr function);
+void mesche_vm_define_native(VM *vm, const char *name, FunctionPtr function, bool exported);
 void mesche_mem_mark_object(VM *vm, Object *object);
 
 #endif

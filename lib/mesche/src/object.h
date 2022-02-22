@@ -17,8 +17,14 @@
 #define IS_FUNCTION(value) mesche_object_is_kind(value, ObjectKindFunction)
 #define AS_FUNCTION(value) ((ObjectFunction *)AS_OBJECT(value))
 
+#define IS_SYMBOL(value) mesche_object_is_kind(value, ObjectKindSymbol)
+#define AS_SYMBOL(value) ((ObjectSymbol *)AS_OBJECT(value))
+
 #define IS_KEYWORD(value) mesche_object_is_kind(value, ObjectKindKeyword)
 #define AS_KEYWORD(value) ((ObjectKeyword *)AS_OBJECT(value))
+
+#define IS_MODULE(value) mesche_object_is_kind(value, ObjectKindModule)
+#define AS_MODULE(value) ((ObjectModule *)AS_OBJECT(value))
 
 #define IS_POINTER(value) mesche_object_is_kind(value, ObjectKindPointer)
 #define AS_POINTER(value) ((ObjectPointer *)AS_OBJECT(value))
@@ -41,7 +47,8 @@ typedef enum {
   ObjectKindFunction,
   ObjectKindClosure,
   ObjectKindNativeFunction,
-  ObjectKindPointer
+  ObjectKindPointer,
+  ObjectKindModule
 } ObjectKind;
 
 struct Object {
@@ -101,9 +108,17 @@ struct ObjectUpvalue {
 
 struct ObjectClosure {
   Object object;
+  ObjectModule *module;
   ObjectFunction *function;
   ObjectUpvalue **upvalues;
   int upvalue_count;
+};
+
+struct ObjectModule {
+  Object object;
+  Table locals;
+  ValueArray exports;
+  ObjectString *name;
 };
 
 typedef struct {
@@ -118,14 +133,16 @@ typedef struct {
 } ObjectPointer;
 
 ObjectString *mesche_object_make_string(VM *vm, const char *chars, int length);
+ObjectSymbol *mesche_object_make_symbol(VM *vm, const char *chars, int length);
 ObjectKeyword *mesche_object_make_keyword(VM *vm, const char *chars, int length);
 ObjectUpvalue *mesche_object_make_upvalue(VM *vm, Value *slot);
 ObjectFunction *mesche_object_make_function(VM *vm, FunctionType type);
 void mesche_object_function_keyword_add(MescheMemory *mem, ObjectFunction *function,
                                         KeywordArgument keyword_arg);
-ObjectClosure *mesche_object_make_closure(VM *vm, ObjectFunction *function);
+ObjectClosure *mesche_object_make_closure(VM *vm, ObjectFunction *function, ObjectModule *module);
 ObjectNativeFunction *mesche_object_make_native_function(VM *vm, FunctionPtr function);
 ObjectPointer *mesche_object_make_pointer(VM *vm, void *ptr, bool is_managed);
+ObjectModule *mesche_object_make_module(VM *vm, ObjectString *name);
 
 void mesche_object_free(VM *vm, struct Object *object);
 void mesche_object_print(Value value);

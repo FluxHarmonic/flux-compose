@@ -50,7 +50,7 @@ ObjectString *mesche_object_make_string(VM *vm, const char *chars, int length) {
   // Allocate and initialize the string object
   ObjectString *string = ALLOC_OBJECT_EX(vm, ObjectString, length + 1, ObjectKindString);
   memcpy(string->chars, chars, length);
-  string->chars[length + 1] = '\0';
+  string->chars[length] = '\0';
   string->length = length;
   string->hash = hash;
 
@@ -157,7 +157,7 @@ ObjectFunction *mesche_object_make_function(VM *vm, FunctionType type) {
   return function;
 }
 
-ObjectClosure *mesche_object_make_closure(VM *vm, ObjectFunction *function) {
+ObjectClosure *mesche_object_make_closure(VM *vm, ObjectFunction *function, ObjectModule *module) {
   // Allocate upvalues for this closure instance
   ObjectUpvalue **upvalues = ALLOC(vm, ObjectUpvalue **, function->upvalue_count);
   for (int i = 0; i < function->upvalue_count; i++) {
@@ -166,6 +166,7 @@ ObjectClosure *mesche_object_make_closure(VM *vm, ObjectFunction *function) {
 
   ObjectClosure *closure = ALLOC_OBJECT(vm, ObjectClosure, ObjectKindClosure);
   closure->function = function;
+  closure->module = module;
   closure->upvalues = upvalues;
   closure->upvalue_count = function->upvalue_count;
   return closure;
@@ -182,6 +183,17 @@ ObjectPointer *mesche_object_make_pointer(VM *vm, void *ptr, bool is_managed) {
   pointer->ptr = ptr;
   pointer->is_managed = is_managed;
   return pointer;
+}
+
+ObjectModule *mesche_object_make_module(VM *vm, ObjectString *name) {
+  ObjectModule *module = ALLOC_OBJECT(vm, ObjectModule, ObjectKindModule);
+  module->name = name;
+
+  // Initialize binding tables
+  mesche_table_init(&module->locals);
+  mesche_value_array_init(&module->exports);
+
+  return module;
 }
 
 void mesche_object_free(VM *vm, Object *object) {
@@ -234,8 +246,13 @@ void mesche_object_free(VM *vm, Object *object) {
       break;
     }
   }
-    FREE(vm, ObjectNativeFunction, object);
+  case ObjectKindModule: {
+    ObjectModule *module = (ObjectModule *)object;
+    mesche_table_free((MescheMemory*)vm, &module->locals);
+    mesche_value_array_free((MescheMemory*)vm, &module->exports);
+    FREE(vm, ObjectModule, object);
     break;
+  }
   default:
     PANIC("Don't know how to free object kind %d!", object->kind);
   }
@@ -301,6 +318,14 @@ void mesche_object_print(Value value) {
     break;
   case ObjectKindPointer:
     printf("<pointer %p>", AS_POINTER(value)->ptr);
+    break;
+  case ObjectKindModule: {
+    ObjectModule *module = (ObjectModule *)AS_OBJECT(value);
+    printf("<module (%s) %p>", module->name->chars, module);
+    break;
+  }
+  default:
+    printf("<unknown>");
     break;
   }
 }

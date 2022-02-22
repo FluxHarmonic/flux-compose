@@ -1,0 +1,25 @@
+;; Define the first module
+(define-module (mesche-sample one))
+
+(define one-value 311 :export)
+
+(define (one-print str) :export
+  (display "This string comes from ")
+  (display str)
+  (display "!"))
+
+;; Define the second module
+(define-module (mesche-sample two)
+  (import (mesche-sample one)))
+
+(define (two-print str) :export
+  (one-print "(mesche-sample two)")
+  (display " ")
+  (display str))
+
+;; Switch to the user module and import something!
+(define-module (mesche-user)
+  (import (mesche-sample two)))
+
+;; Call the imported function
+(two-print "Hello modular world!")

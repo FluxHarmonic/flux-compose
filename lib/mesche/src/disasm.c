@@ -79,6 +79,14 @@ int mesche_disasm_instr(Chunk *chunk, int offset) {
     return mesche_disasm_simple_instr("OP_RETURN", offset);
   case OP_DISPLAY:
     return mesche_disasm_simple_instr("OP_DISPLAY", offset);
+  case OP_DEFINE_MODULE:
+    return mesche_disasm_simple_instr("OP_DEFINE_MODULE", offset);
+  case OP_IMPORT_MODULE:
+    return mesche_disasm_simple_instr("OP_IMPORT_MODULE", offset);
+  case OP_ENTER_MODULE:
+    return mesche_disasm_simple_instr("OP_ENTER_MODULE", offset);
+  case OP_EXPORT_SYMBOL:
+    return mesche_disasm_const_instr("OP_EXPORT_SYMBOL", chunk, offset);
   case OP_DEFINE_GLOBAL:
     return mesche_disasm_const_instr("OP_DEFINE_GLOBAL", chunk, offset);
   case OP_READ_GLOBAL:

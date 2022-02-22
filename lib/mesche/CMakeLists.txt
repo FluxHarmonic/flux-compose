@@ -7,4 +7,6 @@ target_sources(mesche PRIVATE
   src/scanner.c
   src/table.c
   src/value.c
+  src/string.c
+  src/module.c
   src/vm.c)

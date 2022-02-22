@@ -35,12 +35,13 @@ int main(int argc, char **argv) {
     mesche_vm_init(&vm);
 
     // Register some native functions
-    mesche_vm_define_native(&vm, "show-preview-window", flux_graphics_func_show_preview_window);
-    mesche_vm_define_native(&vm, "render-to-file", flux_graphics_func_render_to_file);
+    mesche_module_enter_by_name(&vm, "flux graphics");
+    mesche_vm_define_native(&vm, "show-preview-window", flux_graphics_func_show_preview_window, true);
+    mesche_vm_define_native(&vm, "render-to-file", flux_graphics_func_render_to_file, true);
     mesche_vm_define_native(&vm, "flux-harmonic-thumbnail",
-                            flux_graphics_func_flux_harmonic_thumbnail);
-    mesche_vm_define_native(&vm, "font-load-internal", flux_graphics_func_load_font_internal);
-    mesche_vm_define_native(&vm, "image-load-internal", flux_texture_func_image_load_internal);
+                            flux_graphics_func_flux_harmonic_thumbnail, true);
+    mesche_vm_define_native(&vm, "font-load-internal", flux_graphics_func_load_font_internal, true);
+    mesche_vm_define_native(&vm, "image-load-internal", flux_texture_func_image_load_internal, true);
 
     mesche_vm_eval_string(&vm, script_source);
     printf("\n");

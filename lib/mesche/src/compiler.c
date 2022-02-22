@@ -57,6 +57,11 @@ typedef struct CompilerContext {
   Upvalue upvalues[UINT8_COUNT];
 } CompilerContext;
 
+typedef struct {
+  bool is_export;
+  ObjectString *doc_string;
+} DefineAttributes;
+
 void mesche_compiler_mark_roots(void *target) {
   CompilerContext *ctx = (CompilerContext *)target;
 
@@ -199,16 +204,22 @@ static void compiler_parse_number(CompilerContext *ctx) {
   compiler_emit_constant(ctx, NUMBER_VAL(value));
 }
 
+static ObjectString *compiler_parse_string_literal(CompilerContext *ctx) {
+  return mesche_object_make_string(ctx->vm, ctx->parser->previous.start + 1,
+                                   ctx->parser->previous.length - 2);
+}
+
 static void compiler_parse_string(CompilerContext *ctx) {
-  compiler_emit_constant(
-      ctx, OBJECT_VAL(mesche_object_make_string(ctx->vm, ctx->parser->previous.start + 1,
-                                                ctx->parser->previous.length - 2)));
+  compiler_emit_constant(ctx, OBJECT_VAL(compiler_parse_string_literal(ctx)));
+}
+
+static ObjectKeyword *compiler_parse_keyword_literal(CompilerContext *ctx) {
+  return mesche_object_make_keyword(ctx->vm, ctx->parser->previous.start + 1,
+                                    ctx->parser->previous.length - 1);
 }
 
 static void compiler_parse_keyword(CompilerContext *ctx) {
-  compiler_emit_constant(
-      ctx, OBJECT_VAL(mesche_object_make_keyword(ctx->vm, ctx->parser->previous.start + 1,
-                                                 ctx->parser->previous.length - 1)));
+  compiler_emit_constant(ctx, OBJECT_VAL(compiler_parse_keyword_literal(ctx)));
 }
 
 static void compiler_parse_symbol_literal(CompilerContext *ctx) {
@@ -392,7 +403,7 @@ static void compiler_parse_identifier(CompilerContext *ctx) {
   }
 }
 
-static void compiler_define_variable(CompilerContext *ctx, uint8_t variable_constant) {
+static void compiler_define_variable_ex(CompilerContext *ctx, uint8_t variable_constant, DefineAttributes *define_attributes) {
   // We don't define global variables in local scopes
   if (ctx->scope_depth > 0) {
     // TODO: Is this necessary?
@@ -401,6 +412,16 @@ static void compiler_define_variable(CompilerContext *ctx, uint8_t variable_cons
   }
 
   compiler_emit_bytes(ctx, OP_DEFINE_GLOBAL, variable_constant);
+
+  if (define_attributes) {
+    if (define_attributes->is_export) {
+      compiler_emit_bytes(ctx, OP_EXPORT_SYMBOL, variable_constant);
+    }
+  }
+}
+
+static void compiler_define_variable(CompilerContext *ctx, uint8_t variable_constant) {
+  compiler_define_variable_ex(ctx, variable_constant, NULL);
 }
 
 static void compiler_parse_set(CompilerContext *ctx) {
@@ -472,7 +493,33 @@ static void compiler_parse_let(CompilerContext *ctx) {
   compiler_end_scope(ctx);
 }
 
-static void compiler_parse_lambda_inner(CompilerContext *ctx) {
+static void compiler_parse_define_attributes(CompilerContext *ctx, DefineAttributes *define_attributes) {
+  for (;;) {
+    if (ctx->parser->current.kind == TokenKindKeyword) {
+      compiler_advance(ctx);
+
+      ObjectKeyword *keyword = compiler_parse_keyword_literal(ctx);
+      if (memcmp(keyword->string.chars, "export", 7) == 0) {
+        define_attributes->is_export = true;
+      } else {
+        // TODO: Warn on unknown keywords?
+      }
+
+      mesche_object_free(ctx->vm, keyword);
+    } else {
+      break;
+    }
+  }
+
+  // Look for a docstring
+  if (ctx->parser->current.kind == TokenKindString) {
+    // Parse the string and store it
+    compiler_advance(ctx);
+    define_attributes->doc_string = compiler_parse_string_literal(ctx);
+  }
+}
+
+static void compiler_parse_lambda_inner(CompilerContext *ctx, DefineAttributes *define_attributes) {
   // Create a new compiler context for parsing the function body
   CompilerContext func_ctx;
   compiler_init_context(&func_ctx, ctx, TYPE_FUNCTION);
@@ -537,6 +584,11 @@ static void compiler_parse_lambda_inner(CompilerContext *ctx) {
     }
   }
 
+  // Parse any definition attributes if necessary
+  if (define_attributes) {
+    compiler_parse_define_attributes(&func_ctx, define_attributes);
+  }
+
   // Parse body
   compiler_parse_block(&func_ctx, true);
 
@@ -557,10 +609,14 @@ static void compiler_parse_lambda_inner(CompilerContext *ctx) {
 static void compiler_parse_lambda(CompilerContext *ctx) {
   // Consume the leading paren and let the shared lambda parser take over
   compiler_consume(ctx, TokenKindLeftParen, "Expected left paren to begin argument list.");
-  compiler_parse_lambda_inner(ctx);
+  compiler_parse_lambda_inner(ctx, NULL);
 }
 
 static void compiler_parse_define(CompilerContext *ctx) {
+  DefineAttributes define_attributes;
+  define_attributes.is_export = false;
+  define_attributes.doc_string = NULL;
+
   // The next symbol should either be a symbol or an open paren to define a function
   bool is_func = false;
   if (ctx->parser->current.kind == TokenKindLeftParen) {
@@ -573,15 +629,63 @@ static void compiler_parse_define(CompilerContext *ctx) {
   uint8_t variable_constant = variable_constant = compiler_parse_symbol(ctx, true);
   if (is_func) {
     // Let the lambda parser take over
-    compiler_parse_lambda_inner(ctx);
+    compiler_parse_lambda_inner(ctx, &define_attributes);
   } else {
     // Parse a normal expression
     compiler_parse_expr(ctx);
+    compiler_parse_define_attributes(ctx, &define_attributes);
     compiler_consume(ctx, TokenKindRightParen, "Expected closing paren.");
   }
 
   // TODO: Only allow defines at the top of let/lambda bodies
-  compiler_define_variable(ctx, variable_constant);
+  compiler_define_variable_ex(ctx, variable_constant, &define_attributes);
+}
+
+static void compiler_parse_module_symbol_list(CompilerContext *ctx) {
+  uint8_t symbol_count = 0;
+  for (;;) {
+    // Bail out when we hit the closing parentheses
+    if (ctx->parser->current.kind == TokenKindRightParen) {
+      // Emit opcode
+      compiler_advance(ctx);
+      compiler_emit_bytes(ctx, OP_LIST, symbol_count);
+      return;
+    }
+
+    compiler_consume(ctx, TokenKindSymbol, "Module names can only be comprised of symbols.");
+    compiler_parse_symbol_literal(ctx);
+    symbol_count++;
+  }
+}
+
+static void compiler_parse_define_module(CompilerContext *ctx) {
+  compiler_consume(ctx, TokenKindLeftParen, "Expected left paren after 'define-module'");
+
+  // Read the symbol list for the module path
+  compiler_parse_module_symbol_list(ctx);
+  compiler_emit_byte(ctx, OP_DEFINE_MODULE);
+
+  // Check for a possible 'import' expression
+  if (ctx->parser->current.kind == TokenKindLeftParen) {
+    compiler_consume(ctx, TokenKindLeftParen, "Expected left paren after 'define-module'");
+    compiler_consume(ctx, TokenKindImport, "Expected 'import' inside of 'define-module'.");
+
+    // There can be multiple import specifications
+    for (;;) {
+      if (ctx->parser->current.kind == TokenKindRightParen) {
+        // Import list is done
+        compiler_advance(ctx);
+        break;
+      }
+
+      compiler_consume(ctx, TokenKindLeftParen, "Expected left paren after 'import'");
+
+      compiler_parse_module_symbol_list(ctx);
+      compiler_emit_byte(ctx, OP_IMPORT_MODULE);
+    }
+  }
+
+  compiler_consume(ctx, TokenKindRightParen, "Expected right paren to complete 'define-module' expression.");
 }
 
 static int compiler_emit_jump(CompilerContext *ctx, uint8_t instruction) {
@@ -679,14 +783,37 @@ static void compiler_parse_operator_call(CompilerContext *ctx, Token *call_token
   }
 }
 
+static void compiler_parse_module_import(CompilerContext *ctx) {
+  compiler_consume(ctx, TokenKindLeftParen, "Expected left paren after 'module-import'");
+  compiler_parse_module_symbol_list(ctx);
+  compiler_emit_byte(ctx, OP_IMPORT_MODULE);
+  compiler_consume(ctx, TokenKindRightParen, "Expected right paren to complete 'module-import'");
+}
+
+static void compiler_parse_module_enter(CompilerContext *ctx) {
+  compiler_consume(ctx, TokenKindLeftParen, "Expected left paren after 'module-enter'");
+  compiler_parse_module_symbol_list(ctx);
+  compiler_emit_byte(ctx, OP_ENTER_MODULE);
+  compiler_consume(ctx, TokenKindRightParen, "Expected right paren to complete 'module-enter'");
+}
+
 static bool compiler_parse_special_form(CompilerContext *ctx, Token *call_token) {
-  TokenKind operator= call_token->kind;
+  TokenKind operator = call_token->kind;
   switch (operator) {
   case TokenKindBegin:
     compiler_parse_block(ctx, true);
     break;
   case TokenKindDefine:
     compiler_parse_define(ctx);
+    break;
+  case TokenKindDefineModule:
+    compiler_parse_define_module(ctx);
+    break;
+  case TokenKindModuleImport:
+    compiler_parse_module_import(ctx);
+    break;
+  case TokenKindModuleEnter:
+    compiler_parse_module_enter(ctx);
     break;
   case TokenKindSet:
     compiler_parse_set(ctx);
