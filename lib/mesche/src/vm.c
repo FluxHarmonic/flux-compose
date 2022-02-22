@@ -155,6 +155,7 @@ static void mem_darken_object(VM *vm, Object *object) {
     ObjectCons *cons = (ObjectCons *)object;
     mem_mark_value(vm, cons->car);
     mem_mark_value(vm, cons->cdr);
+    break;
   }
   case ObjectKindClosure: {
     ObjectClosure *closure = (ObjectClosure *)object;

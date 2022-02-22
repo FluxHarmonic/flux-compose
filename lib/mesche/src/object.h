@@ -64,16 +64,20 @@ struct ObjectString {
   char chars[];
 };
 
+struct ObjectSymbol {
+  // A symbol is basically a tagged string
+  struct ObjectString string;
+};
+
 struct ObjectKeyword {
   // A keyword is basically a tagged string
   struct ObjectString string;
 };
 
-struct ObjectSymbol {
+struct ObjectCons {
   struct Object object;
-  uint32_t hash;
-  int length;
-  char chars[];
+  Value car;
+  Value cdr;
 };
 
 typedef enum { TYPE_FUNCTION, TYPE_SCRIPT } FunctionType;
@@ -135,6 +139,7 @@ typedef struct {
 ObjectString *mesche_object_make_string(VM *vm, const char *chars, int length);
 ObjectSymbol *mesche_object_make_symbol(VM *vm, const char *chars, int length);
 ObjectKeyword *mesche_object_make_keyword(VM *vm, const char *chars, int length);
+ObjectCons *mesche_object_make_cons(VM *vm, Value car, Value cdr);
 ObjectUpvalue *mesche_object_make_upvalue(VM *vm, Value *slot);
 ObjectFunction *mesche_object_make_function(VM *vm, FunctionType type);
 void mesche_object_function_keyword_add(MescheMemory *mem, ObjectFunction *function,

@@ -29,11 +29,12 @@ typedef struct ObjectModule ObjectModule;
 #define IS_ANY(value) (true)
 #define IS_T(value) ((value).kind == VALUE_TRUE)
 #define IS_NIL(value) ((value).kind == VALUE_NIL)
+#define IS_EMPTY(value) ((value).kind == VALUE_EMPTY)
 #define IS_FALSEY(value) (IS_NIL(value))
 #define IS_NUMBER(value) ((value).kind == VALUE_NUMBER)
 #define IS_STRING(value) mesche_object_is_kind(value, ObjectKindString)
 
-typedef enum { VALUE_NIL, VALUE_TRUE, VALUE_NUMBER, VALUE_OBJECT } ValueKind;
+typedef enum { VALUE_NIL, VALUE_TRUE, VALUE_EMPTY, VALUE_NUMBER, VALUE_OBJECT } ValueKind;
 
 typedef struct {
   ValueKind kind;
