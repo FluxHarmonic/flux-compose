@@ -73,8 +73,8 @@ static void scene_render_image(FluxRenderContext context, Scene *scene, SceneIma
   FluxDrawArgs draw_args;
   draw_args.shader_program = 0;
 
-  flux_graphics_draw_args_scale(&draw_args, 1.5f, 1.5f);
-  flux_graphics_draw_args_center(&draw_args, false);
+  flux_graphics_draw_args_scale(&draw_args, image->scale, image->scale);
+  flux_graphics_draw_args_center(&draw_args, image->centered);
   flux_graphics_draw_texture_ex(context, image->texture, image->position[0], image->position[1],
                                 &draw_args);
 }
@@ -93,12 +93,14 @@ void flux_scene_render(FluxRenderContext context, Scene *scene) {
   }
 }
 
-SceneImage *flux_scene_make_image(FluxTexture *texture, double x, double y) {
+SceneImage *flux_scene_make_image(FluxTexture *texture, double x, double y, double scale, bool centered) {
   SceneImage *image = flux_memory_alloc(sizeof(SceneImage));
   image->member.kind = TYPE_IMAGE;
   image->texture = texture;
   image->position[0] = x;
   image->position[1] = y;
+  image->scale = scale;
+  image->centered = centered;
 
   return image;
 }
@@ -112,8 +114,10 @@ Value flux_scene_func_scene_image_make(MescheMemory *mem, int arg_count, Value *
   FluxTexture *texture = texture_ptr->ptr;
   double pos_x = AS_NUMBER(args[1]);
   double pos_y = AS_NUMBER(args[2]);
+  double scale = AS_NUMBER(args[3]);
+  bool centered = AS_BOOL(args[4]);
 
-  SceneImage *image = flux_scene_make_image(texture, pos_x, pos_y);
+  SceneImage *image = flux_scene_make_image(texture, pos_x, pos_y, scale, centered);
   return OBJECT_VAL(mesche_object_make_pointer((VM *)mem, image, true));
 }
 

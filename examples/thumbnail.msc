@@ -9,8 +9,8 @@
 (define (image-load path) :export
   (image-load-internal path))
 
-(define (image :keys name texture x y scale) :export
-  (scene-image-make texture x y scale))
+(define (image :keys name texture x y scale centered) :export
+  (scene-image-make texture x y scale centered))
 
 (define (scene :keys width height members) :export
   (scene-make width height members))
@@ -23,11 +23,9 @@
 
 (define width 2500)
 (define height 1406)
-
-(show-preview-window width height)
+(define date-string "February 22, 2022")
 
 (define jost-font (font-load :family "Jost" :weight "SemiBold" :size 450))
-
 (define bg-image (image-load "/home/daviwil/Notes/Shows/FluxHarmonic/Media/Flux-Harmonic-BG-Base.png"))
 (define logo-image (image-load "/home/daviwil/Notes/Shows/FluxHarmonic/Media/Flux Harmonic.png"))
 
@@ -36,11 +34,14 @@
         :height height
         :members (list (image :name 'bg
                               :texture bg-image
-                              :x 0 :y 0)
+                              :x 0 :y 0
+                              :centered nil
+                              :scale (/ width 3500))
                        (image :name 'logo
                               :texture logo-image
                               :x (- (/ width 2) 500)
-                              :y (/ height 5)))))
+                              :y (/ height 5)
+                              :centered nil
+                              :scale (/ 1700 3040)))))
 
-;; (flux-harmonic-thumbnail "February 17, 2022")
-;; (render-to-file "thumbnail.png")
+(render-to-file "thumbnail.png")

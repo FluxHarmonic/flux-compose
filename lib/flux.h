@@ -91,8 +91,7 @@ extern FluxWindow flux_graphics_window_create(int width, int height, const char 
 extern void flux_graphics_window_show(FluxWindow window);
 extern void flux_graphics_window_destroy(FluxWindow window);
 
-extern void flux_graphics_loop_start(FluxWindow window);
-extern void flux_graphics_loop_wait(void);
+extern void flux_graphics_loop_start(FluxWindow window, MescheRepl *repl);
 
 extern void flux_graphics_draw_args_scale(FluxDrawArgs *args, float scale_x, float scale_y);
 extern void flux_graphics_draw_args_rotate(FluxDrawArgs *args, float rotation);
@@ -155,6 +154,8 @@ typedef struct {
   SceneMember member;
   FluxTexture texture;
   vec2 position;
+  double scale;
+  bool centered;
 } SceneImage;
 
 typedef struct {
@@ -164,7 +165,7 @@ typedef struct {
   SceneMember **members;
 } Scene;
 
-SceneImage *flux_scene_make_image(FluxTexture *texture, double x, double y);
+SceneImage *flux_scene_make_image(FluxTexture *texture, double x, double y, double scale, bool centered);
 Scene *flux_scene_make_scene(double width, double height);
 void flux_scene_render(FluxRenderContext context, Scene *scene);
 

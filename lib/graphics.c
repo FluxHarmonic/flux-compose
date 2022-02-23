@@ -7,7 +7,6 @@
 #include <inttypes.h>
 #include <math.h>
 #include <mesche.h>
-#include <pthread.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -52,7 +51,6 @@ const char *TexturedFragmentShaderText =
          void main() { gl_FragColor = texture(tex0, tex_coords) * color; });
 
 uint8_t flux_graphics_initialized = 0;
-pthread_t flux_graphics_thread_handle;
 
 struct _FluxRenderContext {
   vec2 screen_size;
@@ -64,6 +62,7 @@ struct _FluxRenderContext {
 struct _FluxWindow {
   float *width, *height;
   struct _FluxRenderContext context;
+  bool is_resizing;
   GLFWwindow *glfwWindow;
 };
 
@@ -72,6 +71,11 @@ FluxWindow preview_window;
 
 void glfw_error_callback(int error, const char *description) {
   flux_log("GLFW error %d: %s\n", error, description);
+}
+
+void flux_graphics_window_size_set(FluxWindow window, int width, int height) {
+  window->is_resizing = true;
+  glfwSetWindowSize(window->glfwWindow, width, height);
 }
 
 void flux_graphics_window_size_update(FluxWindow window, int width, int height) {
@@ -84,6 +88,9 @@ void flux_graphics_window_size_update(FluxWindow window, int width, int height) 
   // Update the viewport and recalculate projection matrix
   glViewport(0, 0, width, height);
   glm_ortho(0.f, *window->width, *window->height, 0.f, -1.f, 1.f, window->context.screen_matrix);
+
+  // Window is no longer resizing
+  window->is_resizing = false;
 }
 
 void flux_graphics_window_size_callback(GLFWwindow *glfwWindow, int width, int height) {
@@ -126,6 +133,8 @@ FluxWindow flux_graphics_window_create(int width, int height, const char *title)
   window->height = &window->context.screen_size[1];
   window->context.desired_size[0] = width;
   window->context.desired_size[1] = height;
+  window->is_resizing = false;
+
   *window->width = width;
   *window->height = height;
 
@@ -134,6 +143,17 @@ FluxWindow flux_graphics_window_create(int width, int height, const char *title)
 
   // Respond to window size changes
   glfwSetWindowSizeCallback(glfwWindow, flux_graphics_window_size_callback);
+
+  // Make the window's context current before loading OpenGL DLLs
+  glfwMakeContextCurrent(glfwWindow);
+
+  // Bind to OpenGL functions
+  if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
+    PANIC("Failed to initialize GLAD!");
+    return NULL;
+  }
+
+  flux_log("OpenGL Version %d.%d loaded\n", GLVersion.major, GLVersion.minor);
 
   return window;
 }
@@ -512,7 +532,7 @@ void flux_graphics_render_thumbnail(FluxRenderContext context) {
       flux_log("Could not find a file for font: %s\n", font_name);
     } else {
       // Load the font and free the allocation font path
-      jost_font = flux_font_load_file(font_path, 450);
+      jost_font = flux_font_load_file(font_path, 200);
       free(font_path);
       font_path = NULL;
     }
@@ -540,28 +560,16 @@ void flux_graphics_render_thumbnail(FluxRenderContext context) {
 
   // Draw some text if the font got loaded
   if (jost_font) {
-    flux_font_draw_text(context, jost_font, flux_thumbnail_str, 465,
+    flux_font_draw_text(context, jost_font, flux_thumbnail_str, 405,
                         context->desired_size[1] - 150);
   }
 }
 
-void *flux_graphics_render_loop(void *arg) {
+void flux_graphics_loop_start(FluxWindow window, MescheRepl *repl) {
   float amt, scale;
   Scene *current_scene = NULL;
-  FluxWindow window = arg;
   FluxRenderContext context = &window->context;
   GLFWwindow *glfwWindow = window->glfwWindow;
-
-  // Make the window's context current before loading OpenGL DLLs
-  glfwMakeContextCurrent(glfwWindow);
-
-  // Bind to OpenGL functions
-  if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
-    PANIC("Failed to initialize GLAD!");
-    return NULL;
-  }
-
-  flux_log("OpenGL Version %d.%d loaded\n", GLVersion.major, GLVersion.minor);
 
   // TODO: Is this the best place for this?
   // Register a key callback for input handling
@@ -572,10 +580,6 @@ void *flux_graphics_render_loop(void *arg) {
 
   // Set the swap interval to prevent tearing
   glfwSwapInterval(1);
-
-  // TODO: Should I add scene flipping back here as an event to be handled?
-  /* flux_log("Received set scene event!\n"); */
-  /* flip_current_scene(&current_scene); */
 
   // Enable blending
   glEnable(GL_BLEND);
@@ -592,7 +596,10 @@ void *flux_graphics_render_loop(void *arg) {
     // Poll for events for this frame
     glfwPollEvents();
 
-    // TODO: Read from the REPL asynchronously
+    // Read from the REPL asynchronously
+    if (repl != NULL) {
+      mesche_repl_poll(repl);
+    }
 
     // Clear the screen
     glClearColor(0.0, 0.0, 0.0, 1.0);
@@ -612,7 +619,10 @@ void *flux_graphics_render_loop(void *arg) {
 
     // Should we switch to a new scene?
     if (next_scene) {
-      printf("Switching to next scene...\n");
+      // Resize the window to fit the scene
+      flux_graphics_window_size_set(window, next_scene->width, next_scene->height);
+
+      // Set the current scene to be rendered
       current_scene = next_scene;
       next_scene = NULL;
     }
@@ -622,37 +632,29 @@ void *flux_graphics_render_loop(void *arg) {
       flux_scene_render(context, current_scene);
     }
 
-    // Render the screen to a file once
-    // TODO: Remove this!
-    if (output_image_path[0] != '\0') {
+    // Swap the render buffers
+    glfwSwapBuffers(glfwWindow);
+
+    // Render the screen to a file if requested and the window isn't waiting for resize
+    if (output_image_path[0] != '\0' && !window->is_resizing) {
       flux_log("Saving image to path: %s\n", output_image_path);
       flux_graphics_save_to_png(window, output_image_path);
       output_image_path[0] = '\0';
     }
 
-    // Swap the render buffers
-    glfwSwapBuffers(glfwWindow);
+    // If the there's no reason to keep the loop open, exit immediately
+    if (!repl) {
+      break;
+    }
   }
 
   flux_log("Render loop is exiting...\n");
 
-  return NULL;
-}
-
-void flux_graphics_loop_start(FluxWindow window) {
-  pthread_create(&flux_graphics_thread_handle, NULL, flux_graphics_render_loop, window);
-  flux_log("Graphics event loop started...\n");
-}
-
-void flux_graphics_loop_wait(void) {
-  if (flux_graphics_thread_handle) {
-    pthread_join(flux_graphics_thread_handle, NULL);
-  }
+  return;
 }
 
 int flux_graphics_init() {
   if (flux_graphics_initialized == 0) {
-    flux_log("Initializing graphics thread...\n");
     flux_graphics_initialized = 1;
 
     // Make sure we're notified about errors
@@ -695,15 +697,9 @@ Value flux_graphics_func_show_preview_window(MescheMemory *mem, int arg_count, V
   int width = AS_NUMBER(args[0]);
   int height = AS_NUMBER(args[1]);
 
-  flux_log("Creating preview window (width: %d / height: %d)\n", width, height);
-
-  if (preview_window == NULL) {
-    // Start the loop and wait until it finishes
-    flux_graphics_init();
-    preview_window = flux_graphics_window_create(width, height, "Flux Compose");
-    flux_graphics_window_show(preview_window);
-    flux_graphics_loop_start(preview_window);
-  }
+  FluxWindow window = (FluxWindow)((VM*)mem)->app_context;
+  glfwSetWindowSize(window->glfwWindow, width, height);
+  flux_graphics_window_show(window);
 
   // TODO: Return preview_window as a pointer
   return T_VAL;
@@ -735,7 +731,5 @@ Value flux_graphics_func_graphics_scene_set(MescheMemory *mem, int arg_count, Va
   }
 
   ObjectPointer *scene_ptr = AS_POINTER(args[0]);
-
-  printf("SETTING THE NEXT SCENE!\n");
   next_scene = (Scene *)scene_ptr->ptr;
 }

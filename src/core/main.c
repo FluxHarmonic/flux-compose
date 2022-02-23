@@ -12,14 +12,16 @@ int main(int argc, char **argv) {
 
   // Check program arguments
   if (argc > 1) {
-    if (strcmp(argv[1], "--repl") == 0) {
-      use_repl = true;
-    } else {
-      // Treat it as a file path
-      script_source = flux_file_read_all(argv[1]);
-      if (script_source == NULL) {
-        printf("ERROR: Could not load script file: %s\n\n", argv[1]);
-        exit(1);
+    for (int i = 1; i < argc; i++) {
+      if (strcmp(argv[i], "--repl") == 0) {
+        use_repl = true;
+      } else {
+        // Treat it as a file path
+        script_source = flux_file_read_all(argv[1]);
+        if (script_source == NULL) {
+          printf("ERROR: Could not load script file: %s\n\n", argv[1]);
+          exit(1);
+        }
       }
     }
   } else {
@@ -27,45 +29,56 @@ int main(int argc, char **argv) {
     exit(0);
   }
 
+
+  VM vm;
+  mesche_vm_init(&vm);
+
+  // Register some native functions
+  mesche_module_enter_by_name(&vm, "flux graphics");
+  mesche_vm_define_native(&vm, "show-preview-window", flux_graphics_func_show_preview_window,
+                          true);
+  mesche_vm_define_native(&vm, "render-to-file", flux_graphics_func_render_to_file, true);
+  mesche_vm_define_native(&vm, "flux-harmonic-thumbnail",
+                          flux_graphics_func_flux_harmonic_thumbnail, true);
+  mesche_vm_define_native(&vm, "font-load-internal", flux_graphics_func_load_font_internal,
+                          false);
+  mesche_vm_define_native(&vm, "image-load-internal", flux_texture_func_image_load_internal,
+                          false);
+  mesche_vm_define_native(&vm, "scene-image-make", flux_scene_func_scene_image_make, false);
+  mesche_vm_define_native(&vm, "scene-make", flux_scene_func_scene_make, false);
+  mesche_vm_define_native(&vm, "graphics-scene-set!", flux_graphics_func_graphics_scene_set,
+                          false);
+
+  // Initialize the graphics subsystem
+  flux_graphics_init();
+  FluxWindow window = flux_graphics_window_create(1280, 720, "Flux Compose");
+  vm.app_context = window;
+
+  MescheRepl *repl = NULL;
   if (use_repl) {
-    flux_repl_start_stdin();
-  } else if (script_source != NULL) {
-    // Evaluate the script
-    VM vm;
-    mesche_vm_init(&vm);
-
-    // Register some native functions
-    mesche_module_enter_by_name(&vm, "flux graphics");
-    mesche_vm_define_native(&vm, "show-preview-window", flux_graphics_func_show_preview_window,
-                            true);
-    mesche_vm_define_native(&vm, "render-to-file", flux_graphics_func_render_to_file, true);
-    mesche_vm_define_native(&vm, "flux-harmonic-thumbnail",
-                            flux_graphics_func_flux_harmonic_thumbnail, true);
-    mesche_vm_define_native(&vm, "font-load-internal", flux_graphics_func_load_font_internal,
-                            false);
-    mesche_vm_define_native(&vm, "image-load-internal", flux_texture_func_image_load_internal,
-                            false);
-    mesche_vm_define_native(&vm, "scene-image-make", flux_scene_func_scene_image_make, false);
-    mesche_vm_define_native(&vm, "scene-make", flux_scene_func_scene_make, false);
-    mesche_vm_define_native(&vm, "graphics-scene-set!", flux_graphics_func_graphics_scene_set,
-                            false);
-
-    mesche_vm_eval_string(&vm, script_source);
-    printf("\n");
-
-    // Report the final memory allocation statistics
-    mesche_mem_report((MescheMemory *)&vm);
-
-    // Wait for the graphics loop to complete
-    flux_graphics_loop_wait();
-
-    // Free the VM and allocated source string
-    mesche_vm_free(&vm);
-    free((void *)script_source);
+    // Start the REPL and show the preview window
+    repl = mesche_repl_start_async(&vm, stdin);
+    flux_graphics_window_show(window);
   }
 
-  // TODO: Destroy window properly
-  /* flux_graphics_window_destroy(window); */
+  if (script_source != NULL) {
+    // Evaluate the script before starting the renderer
+    mesche_vm_eval_string(&vm, script_source);
+    printf("\n");
+  }
+
+  // Start the render loop
+  flux_graphics_loop_start(window, repl);
+
+  // Report the final memory allocation statistics
+  mesche_mem_report((MescheMemory *)&vm);
+
+  // Free the VM and allocated source string
+  mesche_vm_free(&vm);
+  free((void *)script_source);
+
+  // Destroy the window and shut down the renderer
+  flux_graphics_window_destroy(window);
   flux_graphics_end();
 
   return 0;
