@@ -240,7 +240,6 @@ void mesche_object_free(VM *vm, Object *object) {
   case ObjectKindPointer: {
     ObjectPointer *pointer = (ObjectPointer *)object;
     if (pointer->is_managed) {
-      printf("FREEING NATIVE POINTER!\n");
       free(pointer->ptr);
       FREE(vm, ObjectPointer, object);
       break;

@@ -979,7 +979,7 @@ static void compiler_parse_expr(CompilerContext *ctx) {
   /* ]; */
 
   if (ctx->parser->current.kind == TokenKindEOF) {
-    PANIC("Reached EOF token!\n");
+    return;
   }
 
   // An expression can either be a single element or a list

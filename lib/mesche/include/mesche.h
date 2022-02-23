@@ -4,5 +4,6 @@
 #include "../src/object.h"
 #include "../src/module.h"
 #include "../src/vm.h"
+#include "../src/repl.h"
 
 #endif

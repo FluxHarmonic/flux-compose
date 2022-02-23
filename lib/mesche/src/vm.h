@@ -43,6 +43,9 @@ typedef struct {
   int gray_count;
   int gray_capacity;
   Object **gray_stack;
+
+  // An application-specific context object
+  void *app_context;
 } VM;
 
 typedef enum {
