@@ -1,5 +1,6 @@
 ;; Define the first module
-(define-module (mesche-sample one))
+(define-module (mesche-sample one)
+  (import (mesche fs)))
 
 (define one-value 311 :export)
 

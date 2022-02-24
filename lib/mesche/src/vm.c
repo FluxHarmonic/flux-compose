@@ -13,6 +13,8 @@
 #include "util.h"
 #include "value.h"
 #include "module.h"
+#include "fs.h"
+#include "list.h"
 
 // NOTE: Enable this for diagnostic purposes
 /* #define DEBUG_TRACE_EXECUTION */
@@ -257,6 +259,7 @@ void mesche_vm_init(VM *vm) {
   ObjectString *module_name = mesche_object_make_string(vm, "mesche-user", 11);
   vm->root_module = mesche_object_make_module(vm, module_name);
   vm->current_module = vm->root_module;
+  vm->load_paths = NULL;
   mesche_table_set((MescheMemory*)vm, &vm->modules, vm->root_module->name, OBJECT_VAL(vm->root_module));
 
   // Initialize the gray stack
@@ -423,6 +426,7 @@ static void vm_close_upvalues(VM *vm, Value *stack_slot) {
 
 InterpretResult mesche_vm_run(VM *vm) {
   CallFrame *frame = &vm->frames[vm->frame_count - 1];
+  ObjectModule *prev_module = NULL;
 
 #define READ_BYTE() (*frame->ip++)
 #define READ_SHORT() (frame->ip += 2, (uint16_t)((frame->ip[-2] << 8) | frame->ip[-1]))
@@ -571,6 +575,12 @@ InterpretResult mesche_vm_run(VM *vm) {
         return INTERPRET_OK;
       }
 
+      // Restore the previous module if there is one
+      if (prev_module) {
+        vm->current_module = prev_module;
+        prev_module = NULL;
+      }
+
       // Restore the previous result value, call frame, and value stack pointer
       // before continuing execution
       vm->stack_top = frame->slots;
@@ -588,9 +598,23 @@ InterpretResult mesche_vm_run(VM *vm) {
       break;
     }
     case OP_IMPORT_MODULE: {
+      // Hold on to the current module so that we can return to it later
+      prev_module = vm->current_module;
+
       ObjectCons *list = AS_CONS(mesche_vm_stack_pop(vm));
+      Value *stack_top = vm->stack_top;
       mesche_module_import_path(vm, list);
-      mesche_vm_stack_push(vm, OBJECT_VAL(vm->current_module));
+      if (vm->stack_top > stack_top && IS_CLOSURE(vm_stack_peek(vm, 0))) {
+        ObjectClosure *closure = AS_CLOSURE(vm_stack_peek(vm, 0));
+        if (closure->function->type == TYPE_SCRIPT) {
+          // Call the script
+          vm_call(vm, closure, 0);
+          frame = &vm->frames[vm->frame_count - 1];
+        }
+      } else {
+        // Reset the module now so we don't run into trouble later
+        prev_module = NULL;
+      }
       break;
     }
     case OP_ENTER_MODULE: {
@@ -652,7 +676,7 @@ InterpretResult mesche_vm_run(VM *vm) {
         return INTERPRET_COMPILE_ERROR;
       }
 
-      // Return to the previous call frame
+      // Set the current frame to the new call frame
       frame = &vm->frames[vm->frame_count - 1];
       break;
     case OP_CLOSURE: {
@@ -730,6 +754,13 @@ void mesche_vm_define_native(VM *vm, const char *name, FunctionPtr function, boo
   mesche_vm_stack_pop(vm);
 }
 
+void mesche_vm_load_path_add(VM *vm, const char *load_path) {
+  char *resolved_path = mesche_fs_resolve_path(load_path);
+  ObjectString *path_str = mesche_object_make_string(vm, resolved_path, strlen(resolved_path));
+  vm->load_paths = mesche_list_push(vm, vm->load_paths, OBJECT_VAL(path_str));
+  free(resolved_path);
+}
+
 InterpretResult mesche_vm_eval_string(VM *vm, const char *script_string) {
   ObjectFunction *function = mesche_compile_source(vm, script_string);
   if (function == NULL) {
@@ -747,4 +778,39 @@ InterpretResult mesche_vm_eval_string(VM *vm, const char *script_string) {
 
   // Run the VM starting at the first call frame
   return mesche_vm_run(vm);
+}
+
+InterpretResult mesche_vm_load_module(VM *vm, const char *module_path) {
+  char *source = mesche_fs_file_read_all(module_path);
+  if (source == NULL) {
+    // TODO: Report and fail gracefully
+    PANIC("ERROR: Could not load script file: %s\n\n", module_path);
+  }
+
+  ObjectFunction *function = mesche_compile_source(vm, source);
+  if (function == NULL) {
+    return INTERPRET_COMPILE_ERROR;
+  }
+
+  // Push the top-level function as a closure but do not execute it yet!
+  // The OP_IMPORT_MODULE instruction will check for a new script closure
+  // at the top of the value stack and will execute it if found.
+  mesche_vm_stack_push(vm, OBJECT_VAL(function));
+  ObjectClosure *closure = mesche_object_make_closure(vm, function, NULL);
+  mesche_vm_stack_pop(vm);
+  mesche_vm_stack_push(vm, OBJECT_VAL(closure));
+}
+
+InterpretResult mesche_vm_load_file(VM *vm, const char *file_path) {
+  char *source = mesche_fs_file_read_all(file_path);
+  if (source == NULL) {
+    // TODO: Report and fail gracefully
+    PANIC("ERROR: Could not load script file: %s\n\n", file_path);
+  }
+
+  // Eval the script and then free the source string
+  InterpretResult result = mesche_vm_eval_string(vm, source);
+  free(source);
+
+  return result;
 }

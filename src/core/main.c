@@ -8,7 +8,7 @@
 
 int main(int argc, char **argv) {
   bool use_repl = false;
-  const char *script_source = NULL;
+  const char *script_path = NULL;
 
   // Check program arguments
   if (argc > 1) {
@@ -17,11 +17,7 @@ int main(int argc, char **argv) {
         use_repl = true;
       } else {
         // Treat it as a file path
-        script_source = flux_file_read_all(argv[1]);
-        if (script_source == NULL) {
-          printf("ERROR: Could not load script file: %s\n\n", argv[1]);
-          exit(1);
-        }
+        script_path = argv[1];
       }
     }
   } else {
@@ -32,6 +28,9 @@ int main(int argc, char **argv) {
 
   VM vm;
   mesche_vm_init(&vm);
+
+  // Set up load paths
+  mesche_vm_load_path_add(&vm, "lib/mesche/modules/");
 
   // Register some native functions
   mesche_module_enter_by_name(&vm, "flux graphics");
@@ -61,9 +60,9 @@ int main(int argc, char **argv) {
     flux_graphics_window_show(window);
   }
 
-  if (script_source != NULL) {
+  if (script_path != NULL) {
     // Evaluate the script before starting the renderer
-    mesche_vm_eval_string(&vm, script_source);
+    mesche_vm_load_file(&vm, script_path);
     printf("\n");
   }
 
@@ -75,7 +74,6 @@ int main(int argc, char **argv) {
 
   // Free the VM and allocated source string
   mesche_vm_free(&vm);
-  free((void *)script_source);
 
   // Destroy the window and shut down the renderer
   flux_graphics_window_destroy(window);

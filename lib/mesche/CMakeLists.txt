@@ -10,4 +10,6 @@ target_sources(mesche PRIVATE
   src/string.c
   src/module.c
   src/repl.c
+  src/fs.c
+  src/list.c
   src/vm.c)

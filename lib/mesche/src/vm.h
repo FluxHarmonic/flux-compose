@@ -31,6 +31,7 @@ typedef struct {
   Table modules;
   ObjectModule *root_module;
   ObjectModule *current_module;
+  ObjectCons *load_paths;
 
   ObjectUpvalue *open_upvalues;
   Object *objects;
@@ -58,9 +59,12 @@ void mesche_vm_init(VM *vm);
 void mesche_vm_free(VM *vm);
 InterpretResult mesche_vm_run(VM *vm);
 InterpretResult mesche_vm_eval_string(VM *vm, const char *script_string);
+InterpretResult mesche_vm_load_file(VM *vm, const char *file_path);
+InterpretResult mesche_vm_load_module(VM *vm, const char *module_path);
 void mesche_vm_stack_push(VM *vm, Value value);
 Value mesche_vm_stack_pop(VM *vm);
 void mesche_vm_define_native(VM *vm, const char *name, FunctionPtr function, bool exported);
 void mesche_mem_mark_object(VM *vm, Object *object);
+void mesche_vm_load_path_add(VM *vm, const char *load_path);
 
 #endif
