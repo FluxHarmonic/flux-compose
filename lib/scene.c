@@ -36,31 +36,6 @@ Circle *make_circle_struct(int16_t x, int16_t y, int16_t radius, Color *color) {
   return circle;
 }
 
-ValueHeader *flux_graphics_func_circle(VectorCursor *list_cursor, ValueCursor *value_cursor) {
-  int16_t x = 0, y = 0, radius = 0;
-  Color *color = NULL;
-
-  // Read values from K/V pairs
-  while (flux_vector_cursor_has_next(list_cursor)) {
-    ExprHeader *expr = flux_vector_cursor_next(list_cursor);
-    if (expr->kind == ExprKindKeyword) {
-      // TODO: Check for none
-      ExprHeader *value = flux_vector_cursor_next(list_cursor);
-
-      // Which keyword name is it?
-      char *key_name = ((ExprKeyword *)expr)->name;
-      if (strcmp(key_name, "name") == 0) {
-        flux_log("Found a name keyword! %s\n", ((ExprSymbol *)value)->name);
-      }
-    }
-  }
-
-  // TODO: Wrap this in a value type
-  make_circle_struct(x, y, radius, color);
-
-  return NULL;
-}
-
 /* void render_filled_circle(SDL_Renderer *renderer, Circle *circle) { */
 /*   // Draw a circle */
 /*   Color *color = circle->color; */
@@ -93,7 +68,8 @@ void flux_scene_render(FluxRenderContext context, Scene *scene) {
   }
 }
 
-SceneImage *flux_scene_make_image(FluxTexture *texture, double x, double y, double scale, bool centered) {
+SceneImage *flux_scene_make_image(FluxTexture *texture, double x, double y, double scale,
+                                  bool centered) {
   SceneImage *image = flux_memory_alloc(sizeof(SceneImage));
   image->member.kind = TYPE_IMAGE;
   image->texture = texture;

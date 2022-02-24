@@ -165,7 +165,8 @@ typedef struct {
   SceneMember **members;
 } Scene;
 
-SceneImage *flux_scene_make_image(FluxTexture *texture, double x, double y, double scale, bool centered);
+SceneImage *flux_scene_make_image(FluxTexture *texture, double x, double y, double scale,
+                                  bool centered);
 Scene *flux_scene_make_scene(double width, double height);
 void flux_scene_render(FluxRenderContext context, Scene *scene);
 
@@ -177,48 +178,6 @@ uint32_t register_set_scene_event(void);
 void init_staging_scene(void);
 void promote_staging_scene(void);
 void flip_current_scene(Scene **);
-
-// Scripting ----------------------------------------
-
-typedef enum {
-  ValueKindNone,
-  ValueKindInteger,
-  ValueKindFloat,
-  ValueKindString,
-  ValueKindEntity
-} ValueKindOld;
-
-typedef struct {
-  ValueKindOld kind;
-} ValueHeader;
-
-typedef struct {
-  ValueHeader header;
-  int value;
-} ValueInteger;
-
-typedef struct {
-  ValueHeader header;
-  float value;
-} ValueFloat;
-
-typedef struct {
-  ValueHeader header;
-  unsigned int length;
-  char string[];
-} ValueString;
-
-typedef struct {
-  ValueHeader header;
-  void *entity;
-} ValueEntity;
-
-typedef struct {
-  ValueHeader header;
-} ValueFunctionPtr;
-
-extern ValueHeader *flux_script_eval(FILE *script_file);
-extern ValueHeader *flux_script_eval_string(char *script_string);
 
 // Utils --------------------------------------------
 
