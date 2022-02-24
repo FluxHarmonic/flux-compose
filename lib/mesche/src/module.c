@@ -19,8 +19,8 @@ char *mesche_module_make_path(const char* base_path, const char *module_name) {
   int start_index = strlen(base_path);
   char *module_path = malloc(sizeof(char) * 1000);
 
-  // TODO: Normalize path separators
   memcpy(module_path, base_path, start_index);
+  module_path[start_index++] = '/';
 
   for (int i = 0; i < strlen(module_name); i++) {
     module_path[start_index++] = module_name[i] == ' ' ? '/' : module_name[i];
