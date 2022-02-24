@@ -84,26 +84,27 @@ typedef struct {
   const char *shader_text;
 } FluxShaderFile;
 
-extern int flux_graphics_init(void);
-extern void flux_graphics_end(void);
+int flux_graphics_init(void);
+void flux_graphics_end(void);
 
-extern FluxWindow flux_graphics_window_create(int width, int height, const char *title);
-extern void flux_graphics_window_show(FluxWindow window);
-extern void flux_graphics_window_destroy(FluxWindow window);
+FluxWindow flux_graphics_window_create(int width, int height, const char *title);
+void flux_graphics_window_show(FluxWindow window);
+void flux_graphics_window_destroy(FluxWindow window);
 
-extern void flux_graphics_loop_start(FluxWindow window, MescheRepl *repl);
+void flux_graphics_loop_start(FluxWindow window, MescheRepl *repl);
 
-extern void flux_graphics_draw_args_scale(FluxDrawArgs *args, float scale_x, float scale_y);
-extern void flux_graphics_draw_args_rotate(FluxDrawArgs *args, float rotation);
-extern void flux_graphics_draw_args_center(FluxDrawArgs *args, bool centered);
+void flux_graphics_draw_args_scale(FluxDrawArgs *args, float scale_x, float scale_y);
+void flux_graphics_draw_args_rotate(FluxDrawArgs *args, float rotation);
+void flux_graphics_draw_args_center(FluxDrawArgs *args, bool centered);
 
-extern void flux_graphics_draw_texture(FluxRenderContext context, FluxTexture texture, float x,
-                                       float y);
-extern void flux_graphics_draw_texture_ex(FluxRenderContext context, FluxTexture texture, float x,
-                                          float y, FluxDrawArgs *args);
+void flux_graphics_draw_texture(FluxRenderContext context, FluxTexture texture, float x, float y);
+void flux_graphics_draw_texture_ex(FluxRenderContext context, FluxTexture texture, float x, float y,
+                                   FluxDrawArgs *args);
 
-extern GLuint flux_graphics_shader_compile(const FluxShaderFile *shader_files,
-                                           uint32_t shader_count);
+void flux_graphics_draw_rect_fill(FluxRenderContext context, float x, float y, float w, float h,
+                                  vec4 color);
+
+GLuint flux_graphics_shader_compile(const FluxShaderFile *shader_files, uint32_t shader_count);
 
 Value flux_graphics_func_show_preview_window(MescheMemory *mem, int arg_count, Value *args);
 Value flux_graphics_func_render_to_file(MescheMemory *mem, int arg_count, Value *args);
@@ -130,7 +131,7 @@ Value flux_graphics_func_load_font_internal(MescheMemory *mem, int arg_count, Va
 // Scene ------------------------------------------
 
 // Member types
-typedef enum { TYPE_CIRCLE, TYPE_IMAGE } SceneMemberKind;
+typedef enum { TYPE_CIRCLE, TYPE_IMAGE, TYPE_RECT, TYPE_TEXT } SceneMemberKind;
 
 typedef struct {
   uint8_t r;
@@ -159,6 +160,25 @@ typedef struct {
 } SceneImage;
 
 typedef struct {
+  SceneMember member;
+  vec4 color;
+} SceneColor;
+
+typedef struct {
+  SceneMember member;
+  vec2 position;
+  char *string;
+  FluxFont font;
+  SceneColor *color;
+} SceneText;
+
+typedef struct {
+  SceneMember member;
+  vec4 rect;
+  SceneColor *color;
+} SceneRect;
+
+typedef struct {
   double width;
   double height;
   uint32_t member_count;
@@ -171,8 +191,11 @@ Scene *flux_scene_make_scene(double width, double height);
 void flux_scene_render(FluxRenderContext context, Scene *scene);
 
 // Mesche API wrappers
-Value flux_scene_func_scene_image_make(MescheMemory *mem, int arg_count, Value *args);
 Value flux_scene_func_scene_make(MescheMemory *mem, int arg_count, Value *args);
+Value flux_scene_func_scene_image_make(MescheMemory *mem, int arg_count, Value *args);
+Value flux_scene_func_scene_rect_make(MescheMemory *mem, int arg_count, Value *args);
+Value flux_scene_func_scene_text_make(MescheMemory *mem, int arg_count, Value *args);
+Value flux_scene_func_scene_color_make(MescheMemory *mem, int arg_count, Value *args);
 
 uint32_t register_set_scene_event(void);
 void init_staging_scene(void);

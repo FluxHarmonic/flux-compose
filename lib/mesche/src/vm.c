@@ -3,18 +3,18 @@
 #include <stdio.h>
 #include <time.h>
 
-#include "vm.h"
 #include "chunk.h"
 #include "compiler.h"
 #include "disasm.h"
+#include "fs.h"
+#include "list.h"
 #include "mem.h"
+#include "module.h"
 #include "object.h"
 #include "op.h"
 #include "util.h"
 #include "value.h"
-#include "module.h"
-#include "fs.h"
-#include "list.h"
+#include "vm.h"
 
 // NOTE: Enable this for diagnostic purposes
 /* #define DEBUG_TRACE_EXECUTION */
@@ -260,7 +260,8 @@ void mesche_vm_init(VM *vm) {
   vm->root_module = mesche_object_make_module(vm, module_name);
   vm->current_module = vm->root_module;
   vm->load_paths = NULL;
-  mesche_table_set((MescheMemory*)vm, &vm->modules, vm->root_module->name, OBJECT_VAL(vm->root_module));
+  mesche_table_set((MescheMemory *)vm, &vm->modules, vm->root_module->name,
+                   OBJECT_VAL(vm->root_module));
 
   // Initialize the gray stack
   vm->gray_count = 0;
@@ -363,6 +364,13 @@ static bool vm_call_value(VM *vm, Value callee, uint8_t arg_count) {
     case ObjectKindNativeFunction: {
       FunctionPtr func_ptr = AS_NATIVE_FUNC(callee);
       Value result = func_ptr((MescheMemory *)vm, arg_count, vm->stack_top - arg_count);
+
+      // Pop off all of the argument and the function itself
+      for (int i = 0; i < arg_count + 1; i++) {
+        mesche_vm_stack_pop(vm);
+      }
+
+      // Push the result to store it
       mesche_vm_stack_push(vm, result);
       return true;
     }
@@ -372,6 +380,7 @@ static bool vm_call_value(VM *vm, Value callee, uint8_t arg_count) {
   }
 
   vm_runtime_error(vm, "Only functions can be called (received kind %d)", OBJECT_KIND(callee));
+
   return false;
 }
 
@@ -445,6 +454,8 @@ InterpretResult mesche_vm_run(VM *vm) {
     mesche_vm_stack_push(vm, value_type(a op b));                                                  \
   } while (false)
 
+  vm->is_running = true;
+
   for (;;) {
 #ifdef DEBUG_TRACE_EXECUTION
     printf(" ");
@@ -510,9 +521,8 @@ InterpretResult mesche_vm_run(VM *vm) {
         Value list_value;
         for (int i = 0; i < item_count; i++) {
           list_value = mesche_vm_stack_pop(vm);
-          list = mesche_object_make_cons(vm,
-                                         list_value,
-                                         list == NULL ? EMPTY_VAL : OBJECT_VAL(list));
+          list =
+              mesche_object_make_cons(vm, list_value, list == NULL ? EMPTY_VAL : OBJECT_VAL(list));
         }
 
         mesche_vm_stack_push(vm, OBJECT_VAL(list));
@@ -634,7 +644,8 @@ InterpretResult mesche_vm_run(VM *vm) {
       break;
     case OP_READ_GLOBAL:
       name = READ_STRING();
-      Table *globals = frame->closure->module ? &frame->closure->module->locals : &vm->current_module->locals;
+      Table *globals =
+          frame->closure->module ? &frame->closure->module->locals : &vm->current_module->locals;
       if (!mesche_table_get(globals, name, &value)) {
         vm_runtime_error(vm, "Undefined variable '%s'.", name->chars);
         return INTERPRET_RUNTIME_ERROR;
@@ -654,7 +665,8 @@ InterpretResult mesche_vm_run(VM *vm) {
       break;
     case OP_SET_GLOBAL: {
       name = READ_STRING();
-      Table *globals = frame->closure->module ? &frame->closure->module->locals : &vm->current_module->locals;
+      Table *globals =
+          frame->closure->module ? &frame->closure->module->locals : &vm->current_module->locals;
       if (mesche_table_set((MescheMemory *)vm, globals, name, vm_stack_peek(vm, 0))) {
         vm_runtime_error(vm, "Undefined variable '%s'.", name->chars);
         return INTERPRET_RUNTIME_ERROR;
@@ -725,6 +737,8 @@ InterpretResult mesche_vm_run(VM *vm) {
     /* } */
   }
 
+  vm->is_running = false;
+
 #undef READ_STRING
 #undef READ_SHORT
 #undef READ_BYTE
@@ -746,7 +760,8 @@ void mesche_vm_define_native(VM *vm, const char *name, FunctionPtr function, boo
   mesche_table_set((MescheMemory *)vm, &vm->current_module->locals, AS_STRING(*(vm->stack_top - 2)),
                    *(vm->stack_top - 1));
   if (exported) {
-    mesche_value_array_write((MescheMemory *)vm, &vm->current_module->exports, OBJECT_VAL(func_name));
+    mesche_value_array_write((MescheMemory *)vm, &vm->current_module->exports,
+                             OBJECT_VAL(func_name));
   }
 
   // Pop the values we stored temporarily
@@ -799,6 +814,12 @@ InterpretResult mesche_vm_load_module(VM *vm, const char *module_path) {
   ObjectClosure *closure = mesche_object_make_closure(vm, function, NULL);
   mesche_vm_stack_pop(vm);
   mesche_vm_stack_push(vm, OBJECT_VAL(closure));
+
+  if (!vm->is_running) {
+    // Call the initial closure and run the VM
+    vm_call(vm, closure, 0);
+    return mesche_vm_run(vm);
+  }
 }
 
 InterpretResult mesche_vm_load_file(VM *vm, const char *file_path) {

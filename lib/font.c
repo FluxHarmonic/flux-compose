@@ -231,11 +231,11 @@ Value flux_graphics_func_load_font_internal(MescheMemory *mem, int arg_count, Va
     flux_log("Function requires 3 parameters.");
   }
 
-  FluxFont *font = NULL;
+  FluxFont font = NULL;
 
   char *family = AS_CSTRING(args[0]);
   char *weight = AS_CSTRING(args[1]);
-  double size = AS_NUMBER(args[3]);
+  double size = AS_NUMBER(args[2]);
 
   char font_spec[100];
 

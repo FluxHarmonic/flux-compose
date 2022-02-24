@@ -1,31 +1,11 @@
-(define-module (flux graphics))
-
-;; Store the current scene so that it doesn't get garbage collected
-(define current-scene nil)
-
-(define (font-load :keys family weight size) :export
-  (font-load-internal family weight size))
-
-(define (image-load path) :export
-  (image-load-internal path))
-
-(define (image :keys name texture x y scale centered) :export
-  (scene-image-make texture x y scale centered))
-
-(define (scene :keys width height members) :export
-  (scene-make width height members))
-
-(define (scene-render scene) :export
-  (graphics-scene-set! scene))
-
 (define-module (flux thumbnail)
   (import (flux graphics)))
 
 (define width 2500)
 (define height 1406)
-(define date-string "February 22, 2022")
+(define date-string "March 1, 2022")
 
-(define jost-font (font-load :family "Jost" :weight "SemiBold" :size 450))
+(define jost-font (font-load :family "Jost" :weight "SemiBold" :size 200))
 (define bg-image (image-load "/home/daviwil/Notes/Shows/FluxHarmonic/Media/Flux-Harmonic-BG-Base.png"))
 (define logo-image (image-load "/home/daviwil/Notes/Shows/FluxHarmonic/Media/Flux Harmonic.png"))
 
@@ -37,6 +17,17 @@
                               :x 0 :y 0
                               :centered nil
                               :scale (/ width 3500))
+                       (rect :name 'blend
+                             :x 0 :y 0
+                             :width width
+                             :height height
+                             :color (rgba 28 30 31 0.90))
+                       (text :name 'date
+                             :x 405
+                             :y (- height 150)
+                             :string date-string
+                             :font jost-font
+                             :color (rgba 255 255 255 1))
                        (image :name 'logo
                               :texture logo-image
                               :x (- (/ width 2) 500)

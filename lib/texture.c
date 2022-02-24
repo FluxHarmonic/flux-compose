@@ -134,7 +134,7 @@ Value flux_texture_func_image_load_internal(MescheMemory *mem, int arg_count, Va
   }
 
   char *file_path = AS_CSTRING(args[0]);
-  FluxTexture *texture = flux_texture_png_load(file_path);
+  FluxTexture texture = flux_texture_png_load(file_path);
 
   return OBJECT_VAL(mesche_object_make_pointer((VM *)mem, texture, true));
 }

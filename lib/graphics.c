@@ -583,8 +583,8 @@ void flux_graphics_loop_start(FluxWindow window, MescheRepl *repl) {
 
   // Enable blending
   glEnable(GL_BLEND);
-  glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-  /* glBlendFunc(GL_SRC_COLOR, GL_ONE_MINUS_SRC_COLOR); */
+  glBlendEquationSeparate(GL_FUNC_ADD, GL_FUNC_ADD);
+  glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ZERO);
 
   // Enable textures
   glEnable(GL_TEXTURE_2D);
@@ -697,7 +697,7 @@ Value flux_graphics_func_show_preview_window(MescheMemory *mem, int arg_count, V
   int width = AS_NUMBER(args[0]);
   int height = AS_NUMBER(args[1]);
 
-  FluxWindow window = (FluxWindow)((VM*)mem)->app_context;
+  FluxWindow window = (FluxWindow)((VM *)mem)->app_context;
   glfwSetWindowSize(window->glfwWindow, width, height);
   flux_graphics_window_show(window);
 

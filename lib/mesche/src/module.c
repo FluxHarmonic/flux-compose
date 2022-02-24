@@ -1,12 +1,12 @@
-#include<linux/limits.h>
+#include <linux/limits.h>
 #include <stdlib.h>
 
+#include "fs.h"
 #include "module.h"
 #include "object.h"
 #include "string.h"
 #include "table.h"
 #include "util.h"
-#include "fs.h"
 
 void mesche_module_print_name(ObjectModule *module) {
   printf("(%s)", module->name->chars);
@@ -15,7 +15,7 @@ void mesche_module_print_name(ObjectModule *module) {
 // (mesche io) -> modules/mesche/io.msc
 // (substratic graphics texture) -> deps/substratic/graphics/texture.msc
 
-char *mesche_module_make_path(const char* base_path, const char *module_name) {
+char *mesche_module_make_path(const char *base_path, const char *module_name) {
   int start_index = strlen(base_path);
   char *module_path = malloc(sizeof(char) * 1000);
 
@@ -92,7 +92,7 @@ static ObjectModule *mesche_module_resolve_by_name(VM *vm, ObjectString *module_
         PANIC("Could not resolve module (%s) after loading its file.", module_name);
       }
 
-       module = AS_MODULE(module_val);
+      module = AS_MODULE(module_val);
     }
   } else {
     module = AS_MODULE(module_val);

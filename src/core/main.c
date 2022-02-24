@@ -30,16 +30,18 @@ int main(int argc, char **argv) {
 
   // Set up load paths
   mesche_vm_load_path_add(&vm, "lib/mesche/modules/");
+  mesche_vm_load_path_add(&vm, "src/modules/");
 
   // Register some native functions
   mesche_module_enter_by_name(&vm, "flux graphics");
   mesche_vm_define_native(&vm, "show-preview-window", flux_graphics_func_show_preview_window, true);
   mesche_vm_define_native(&vm, "render-to-file", flux_graphics_func_render_to_file, true);
-  mesche_vm_define_native(&vm, "flux-harmonic-thumbnail",
-                          flux_graphics_func_flux_harmonic_thumbnail, true);
   mesche_vm_define_native(&vm, "font-load-internal", flux_graphics_func_load_font_internal, false);
   mesche_vm_define_native(&vm, "image-load-internal", flux_texture_func_image_load_internal, false);
   mesche_vm_define_native(&vm, "scene-image-make", flux_scene_func_scene_image_make, false);
+  mesche_vm_define_native(&vm, "scene-rect-make", flux_scene_func_scene_rect_make, false);
+  mesche_vm_define_native(&vm, "scene-text-make", flux_scene_func_scene_text_make, false);
+  mesche_vm_define_native(&vm, "rgba", flux_scene_func_scene_color_make, true);
   mesche_vm_define_native(&vm, "scene-make", flux_scene_func_scene_make, false);
   mesche_vm_define_native(&vm, "graphics-scene-set!", flux_graphics_func_graphics_scene_set, false);
 

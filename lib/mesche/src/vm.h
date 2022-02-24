@@ -47,6 +47,9 @@ typedef struct {
 
   // An application-specific context object
   void *app_context;
+
+  // Specifies whether the VM is currently running
+  bool is_running;
 } VM;
 
 typedef enum {
