@@ -82,8 +82,8 @@ SceneImage *flux_scene_make_image(FluxTexture *texture, double x, double y, doub
 }
 
 Value flux_scene_func_scene_image_make(MescheMemory *mem, int arg_count, Value *args) {
-  if (arg_count != 4) {
-    flux_log("Function requires 4 parameters.");
+  if (arg_count != 5) {
+    flux_log("Function requires 5 parameters, received %d.\n", arg_count);
   }
 
   ObjectPointer *texture_ptr = AS_POINTER(args[0]);
