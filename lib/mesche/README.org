@@ -2,7 +2,7 @@
 
 Mesche is a programming language that is designed for integration in C applications.
 
-Its primary use is as a high-performance scripting language to drive C applications and enable interactive development of behavior.  The compiler and runtime can be compiled directly into the C application so that this interactivity is available even in shipped applications.
+It is used as a high-performance scripting language to drive C applications and enable interactive development of program behavior.  The compiler and runtime can be compiled directly into the C application so that this interactivity is available even in shipped applications.
 
 * Goals
 
@@ -18,13 +18,13 @@ This project is in a very early stage of development, it's not ready for general
 
 - Compiles directly to bytecode running on a custom VM
 - First-class functions with closures
+- Modules that can be defined and loaded into Mesche projects
 - Native function registration for integrating with C APIs
 - Supports running a VM per OS thread
 
 * Future Features
 
 - Unhygenic (and possibly hygenic) macro definitions
-- Defining code in modules that can be loaded into Mesche projects
 - Defining structure types in Mesche
 - Automatic generation of bindings to C functions and structures by reading in C headers
 - APIs for working with dynamic arrays of C structures
