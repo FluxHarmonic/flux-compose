@@ -1,0 +1,25 @@
+(define-module (flux graphics))
+
+;; Store the current scene so that it doesn't get garbage collected
+(define current-scene nil)
+
+(define (font-load :keys family weight size) :export
+  (font-load-internal family weight size))
+
+(define (image-load path) :export
+  (image-load-internal path))
+
+(define (image :keys name texture x y scale centered) :export
+  (scene-image-make texture x y scale centered))
+
+(define (rect :keys name x y width height color) :export
+  (scene-rect-make x y width height color))
+
+(define (text :keys name x y string font color) :export
+  (scene-text-make x y string font color))
+
+(define (scene :keys width height members) :export
+  (scene-make width height members))
+
+(define (scene-render scene) :export
+  (graphics-scene-set! scene))
