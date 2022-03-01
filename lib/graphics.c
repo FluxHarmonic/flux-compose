@@ -583,8 +583,9 @@ void flux_graphics_loop_start(FluxWindow window, MescheRepl *repl) {
 
   // Enable blending
   glEnable(GL_BLEND);
-  glBlendEquationSeparate(GL_FUNC_ADD, GL_FUNC_ADD);
-  glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ZERO);
+  /* glBlendEquationSeparate(GL_FUNC_ADD, GL_FUNC_ADD); */
+  /* glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ZERO); */
+  glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
   // Enable textures
   glEnable(GL_TEXTURE_2D);
